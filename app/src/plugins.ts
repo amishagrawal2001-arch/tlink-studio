@@ -8,7 +8,7 @@ const nodeModule = require('module') // eslint-disable-line @typescript-eslint/n
 
 const nodeRequire = global['require']
 const isStudioOnlyApp = (process.env.TLINK_STUDIO_APP ?? '1') === '1'
-const STUDIO_ONLY_PLUGIN_PACKAGES = ['tlink-core', 'tlink-studio-shell']
+const STUDIO_ONLY_PLUGIN_PACKAGES = ['tlink-core', 'tlink-studio-shell', 'tlink-local', 'tlink-terminal', 'tlink-settings']
 const STUDIO_ONLY_PLUGIN_PACKAGE_SET = new Set(STUDIO_ONLY_PLUGIN_PACKAGES)
 
 function normalizePath (p: string): string {
@@ -113,6 +113,9 @@ const builtinModules = [
 const compatibilityMappings: Record<string, string> = isStudioOnlyApp
     ? {
         'tabby-core': 'tlink-core',
+        'tabby-terminal': 'tlink-terminal',
+        'tabby-local': 'tlink-local',
+        'tabby-settings': 'tlink-settings',
     }
     : {
         'tabby-core': 'tlink-core',
