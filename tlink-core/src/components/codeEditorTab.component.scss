@@ -2005,17 +2005,18 @@
         align-items: center;
         gap: 8px;
         min-width: 0;
+        overflow: hidden;
         justify-self: start;
     }
 
     .status-message {
         display: inline-block;
-        max-width: 100%;
         color: var(--theme-fg);
         white-space: nowrap;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
+        flex-shrink: 1;
     }
 
     .status-tip {
@@ -2023,12 +2024,11 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: min(48vw, 560px);
+        flex-shrink: 1;
     }
 
     .status-center {
         justify-self: center;
-        width: min(62vw, 980px);
         color: var(--theme-fg-less);
         text-align: center;
         white-space: nowrap;
@@ -2039,6 +2039,7 @@
     .status-right {
         min-width: 0;
         justify-self: end;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: 6px;
