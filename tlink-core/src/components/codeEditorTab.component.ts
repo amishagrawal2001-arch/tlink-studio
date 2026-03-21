@@ -13830,16 +13830,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return term
     }
 
-    openTerminalInNewWindow (cwd?: string): void {
-        try {
-            const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer
-            if (ipcRenderer) {
-                ipcRenderer.send('app:open-terminal-window', cwd ?? null)
-            } else {
-                console.warn('[tlink-studio] ipcRenderer not available for opening terminal window')
-            }
-        } catch (err) {
-            console.error('[tlink-studio] Failed to open terminal window:', err)
+    async openTerminalInNewTab (): Promise<void> {
+        const terminalService = this.resolveTerminalService()
+        if (!terminalService) {
+            this.setError('Terminal service not available')
+            return
+        }
+        const cwd = this.selectedFolderPath ?? this.folderRoot ?? undefined
+        const profile = await this.resolveRunProfile()
+        const term = await terminalService.openTab(profile, cwd, false)
+        if (!term) {
+            this.setError('Failed to open terminal tab')
         }
     }
 
