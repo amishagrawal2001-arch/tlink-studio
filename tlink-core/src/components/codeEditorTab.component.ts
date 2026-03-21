@@ -8434,18 +8434,30 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private resolveTerminalService (): TerminalServiceType|null {
         const nodeRequire = this.getNodeRequire()
         if (!nodeRequire) {
+            console.warn('[tlink-studio] resolveTerminalService: nodeRequire not available')
             return null
         }
 
         try {
             const localModule = nodeRequire('tlink-local')
-            const token = localModule?.TerminalService
-            if (!token) {
+            if (!localModule) {
+                console.warn('[tlink-studio] resolveTerminalService: tlink-local module not found')
                 return null
             }
-            // TerminalService is providedIn: 'root' in tlink-local, so injector lookup is enough.
-            return this.injector.get(token, null)
-        } catch {
+            const token = localModule?.TerminalService
+            if (!token) {
+                console.warn('[tlink-studio] resolveTerminalService: TerminalService token not found in tlink-local. Available exports:', Object.keys(localModule))
+                return null
+            }
+            const service = this.injector.get(token, null)
+            if (!service) {
+                console.warn('[tlink-studio] resolveTerminalService: TerminalService not found in Angular injector')
+                return null
+            }
+            console.info('[tlink-studio] resolveTerminalService: TerminalService resolved successfully')
+            return service
+        } catch (err) {
+            console.error('[tlink-studio] resolveTerminalService error:', err)
             return null
         }
     }
@@ -13816,6 +13828,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         })
         await this.placeTerminalNextToEditor(term)
         return term
+    }
+
+    openTerminalInNewWindow (cwd?: string): void {
+        try {
+            const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer
+            if (ipcRenderer) {
+                ipcRenderer.send('app:open-terminal-window', cwd ?? null)
+            } else {
+                console.warn('[tlink-studio] ipcRenderer not available for opening terminal window')
+            }
+        } catch (err) {
+            console.error('[tlink-studio] Failed to open terminal window:', err)
+        }
     }
 
     private async placeTerminalNextToEditor (term: BaseTerminalTabComponentType): Promise<void> {

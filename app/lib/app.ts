@@ -666,6 +666,18 @@ export class Application {
         })
     }
 
+    async openTerminalWindow (cwd?: string): Promise<Window> {
+        const window = await this.newWindow({
+            width: 900,
+            height: 600,
+            windowRole: 'terminal',
+        })
+        window.ready.then(() => {
+            window.send('host:open-terminal-window', cwd ?? null)
+        })
+        return window
+    }
+
     async openCodeEditorWindow (): Promise<Window> {
         if (this.codeEditorWindow && !this.codeEditorWindow.isDestroyed()) {
             this.codeEditorWindow.present()

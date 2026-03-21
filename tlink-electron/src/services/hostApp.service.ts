@@ -50,6 +50,12 @@ export class ElectronHostAppService extends HostAppService {
             this.openCodeEditorRequest.next()
         }))
 
+        electron.ipcRenderer.on('host:open-terminal-window', (_$event, cwd?: string) => this.zone.run(() => {
+            ;(window as any).__terminalWindowCwd = cwd ?? null
+            ;(window as any).__terminalWindowMode = true
+            this.openTerminalRequest?.next()
+        }))
+
         electron.ipcRenderer.on('cli', (_$event, argv: any, cwd: string, secondInstance: boolean) => this.zone.run(async () => {
             await this.dispatchCLIEvent(injector, { argv, cwd, secondInstance }, 'CLI arguments received')
         }))

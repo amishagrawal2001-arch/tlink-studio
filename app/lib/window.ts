@@ -22,7 +22,7 @@ export interface WindowOptions {
     hidden?: boolean
     width?: number
     height?: number
-    windowRole?: 'default'|'code-editor'|'ai-assistant'
+    windowRole?: 'default'|'code-editor'|'ai-assistant'|'terminal'
 }
 
 abstract class GlasstronWindow extends BrowserWindow {
@@ -45,7 +45,7 @@ export class Window {
     private windowBounds?: Rectangle
     private closing = false
     private hasCustomSize = false // Track if window was created with custom size (e.g., AI Assistant)
-    private windowRole: 'default'|'code-editor'|'ai-assistant' = 'default'
+    private windowRole: 'default'|'code-editor'|'ai-assistant'|'terminal' = 'default'
     private lastVibrancy: { enabled: boolean, type?: string } | null = null
     private disableVibrancyWhileDragging = false
     private touchBarControl: any
