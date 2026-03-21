@@ -170,8 +170,20 @@ const pruneRecentlyHandledProtocolUrls = (): void => {
     }
 }
 
+const flushProtocolUrls = async (): Promise<void> => {
+    while (pendingProtocolUrls.length) {
+        const url = pendingProtocolUrls.shift()
+        if (!url) {
+            continue
+        }
+        queuedProtocolUrls.delete(url)
+        await application.send('host:open-shared-session-url', url)
+        application.focus()
+    }
+}
+
 const queueProtocolUrl = (url: string): void => {
-    const normalizedUrl = String(url ?? '').trim()
+    const normalizedUrl = String(url).trim()
     if (!normalizedUrl) {
         return
     }
@@ -191,18 +203,6 @@ const queueProtocolUrl = (url: string): void => {
     pendingProtocolUrls.push(normalizedUrl)
     if (app.isReady()) {
         void flushProtocolUrls()
-    }
-}
-
-const flushProtocolUrls = async (): Promise<void> => {
-    while (pendingProtocolUrls.length) {
-        const url = pendingProtocolUrls.shift()
-        if (!url) {
-            continue
-        }
-        queuedProtocolUrls.delete(url)
-        await application.send('host:open-shared-session-url', url)
-        application.focus()
     }
 }
 

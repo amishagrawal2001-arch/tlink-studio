@@ -28,7 +28,7 @@ export class PluginManager {
                 npm.load(err => {
                     if (err) {
                         console.error(err)
-                        reject(err)
+                        reject(err instanceof Error ? err : new Error(String(err)))
                         return
                     }
                     npm.config.set('global', false)

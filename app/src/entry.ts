@@ -70,7 +70,7 @@ async function bootstrap (bootstrapData: BootstrapData, plugins: PluginInfo[], s
     }
 
     const pluginModules = await loadPlugins(plugins, (current, total) => {
-        const progressBar = document.querySelector('.progress .bar') as HTMLElement | null
+        const progressBar = document.querySelector<HTMLElement>('.progress .bar')
         if (progressBar) {
             progressBar.style.width = `${100 * current / total}%`
         }

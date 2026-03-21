@@ -173,7 +173,7 @@ export class PTYManager {
 
         ipcMain.on('pty:kill', (_event, id, signal) => {
             this.ptys[id]?.kill(signal)
-            delete this.ptys[id]
+            this.ptys[id] = undefined
         })
 
         ipcMain.on('pty:ack-data', (_event, id, length) => {
