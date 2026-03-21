@@ -673,12 +673,7 @@ export class Application {
             windowRole: 'terminal',
         })
         window.ready.then(() => {
-            // Set code editor mode first to prevent full Tlink Terminal UI
-            window.send('host:open-code-editor', true)
-            // Then open a terminal tab in this window
-            setTimeout(() => {
-                window.send('host:open-terminal-window', cwd ?? null)
-            }, 500)
+            window.send('host:open-terminal-window', cwd ?? null)
         })
         return window
     }
