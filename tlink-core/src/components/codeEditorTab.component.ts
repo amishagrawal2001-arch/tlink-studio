@@ -11240,8 +11240,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
             lineNumbers: 'on',
             lineNumbersMinChars: 2,
-            lineDecorationsWidth: 6,
-            glyphMargin: false,
+            lineDecorationsWidth: 10,
+            glyphMargin: true,
             selectOnLineNumbers: true,
             renderLineHighlight: 'all',
             renderLineHighlightOnlyWhenFocus: false,
@@ -12510,6 +12510,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 targetType === mouseTargetType.GUTTER_LINE_NUMBERS
                 || targetType === mouseTargetType.GUTTER_GLYPH_MARGIN
                 || targetType === mouseTargetType.GUTTER_LINE_DECORATIONS
+                || targetType === mouseTargetType.GUTTER_VIEW_ZONE
             )
             if (isGutterClick) {
                 const anchorLine = this.editorLineSelectionAnchorByEditor.get(editor) ?? lineNumber
@@ -12551,6 +12552,32 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 }
                 editor.setSelection(new SelectionCtor(lineNumber, word.startColumn, lineNumber, word.endColumn))
             })
+        })
+
+        // Support drag-select in the gutter for multi-line selection
+        editor.onMouseDrag?.((event: any) => {
+            const model = editor.getModel?.()
+            const targetType = event?.target?.type
+            const lineNumber = event?.target?.position?.lineNumber
+            if (!model || !Number.isFinite(lineNumber) || lineNumber < 1) {
+                return
+            }
+            const isGutterDrag = (
+                targetType === mouseTargetType.GUTTER_LINE_NUMBERS
+                || targetType === mouseTargetType.GUTTER_GLYPH_MARGIN
+                || targetType === mouseTargetType.GUTTER_LINE_DECORATIONS
+                || targetType === mouseTargetType.GUTTER_VIEW_ZONE
+            )
+            if (!isGutterDrag) {
+                return
+            }
+            const anchorLine = this.editorLineSelectionAnchorByEditor.get(editor)
+            if (!anchorLine) {
+                return
+            }
+            const startLine = Math.min(anchorLine, lineNumber)
+            const endLine = Math.max(anchorLine, lineNumber)
+            editor.setSelection(new SelectionCtor(startLine, 1, endLine, model.getLineMaxColumn(endLine)))
         })
     }
 
