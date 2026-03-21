@@ -28,7 +28,6 @@ export abstract class HostAppService {
     protected workspaceImportRequest = new Subject<void>()
     protected aiAssistantRequest = new Subject<void>()
     protected openCodeEditorRequest = new Subject<void>()
-    protected openTerminalRequest = new Subject<void>()
     protected configChangeBroadcast = new Subject<void>()
     protected logger: Logger
 
@@ -57,10 +56,6 @@ export abstract class HostAppService {
      * Fired when Code Editor should be opened in this window
      */
     get openCodeEditorRequest$ (): Observable<void> { return this.openCodeEditorRequest }
-    /**
-     * Fired when a terminal window should be opened
-     */
-    get openTerminalRequest$ (): Observable<void> { return this.openTerminalRequest }
     /**
      * Fired when Button Bar is selected from the menu
      */

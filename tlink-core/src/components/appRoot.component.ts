@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { Component, Input, HostListener, HostBinding, ViewChildren, ViewChild, Type, OnInit, OnDestroy, Inject, Optional, Injector } from '@angular/core'
+import { Component, Input, HostListener, HostBinding, ViewChildren, ViewChild, Type, OnInit, OnDestroy, Inject, Optional } from '@angular/core'
 import { trigger, style, animate, transition, state } from '@angular/animations'
 import { NgbDropdown, NgbModal } from '@ng-bootstrap/ng-bootstrap'
 import { CdkDragDrop, CdkDragMove, moveItemInArray } from '@angular/cdk/drag-drop'
@@ -201,7 +201,6 @@ export class AppRootComponent implements OnInit, OnDestroy {
         private notifications: NotificationsService,
         private sessionSharing: SessionSharingService,
         @Inject(CLIHandler) @Optional() private cliHandlers: CLIHandler[] = [],
-        private injector: Injector,
         log: LogService,
         private ngbModal: NgbModal,
         _themes: ThemesService,
@@ -284,9 +283,6 @@ export class AppRootComponent implements OnInit, OnDestroy {
                 return
             }
             this.app.openNewTab({ type: CodeEditorTabComponent })
-        }))
-        this.subs.push(this.hostApp.openTerminalRequest$.subscribe(() => {
-            this.openTerminalTab()
         }))
 
         if (window['safeModeReason']) {
@@ -2102,46 +2098,6 @@ export class AppRootComponent implements OnInit, OnDestroy {
             return Color(value).hex()
         } catch {
             return fallback
-        }
-    }
-
-    private openTerminalTab (): void {
-        try {
-            const nodeRequire = (globalThis as any)?.nodeRequire
-                ?? (globalThis as any)?.require
-                ?? (globalThis as any)?.window?.nodeRequire
-                ?? (globalThis as any)?.window?.require
-                ?? null
-            if (!nodeRequire) {
-                console.warn('[tlink-studio] openTerminalTab: nodeRequire not available')
-                return
-            }
-            const localModule = nodeRequire('tlink-local')
-            const token = localModule?.TerminalService
-            if (!token) {
-                console.warn('[tlink-studio] openTerminalTab: TerminalService not found')
-                return
-            }
-            const terminalService = this.injector.get(token, null)
-            if (!terminalService) {
-                console.warn('[tlink-studio] openTerminalTab: TerminalService not in injector')
-                return
-            }
-            // Mark this window as terminal-only mode
-            ;(window as any).__terminalWindowMode = true
-            const cwd = (window as any).__terminalWindowCwd ?? undefined
-            // Close any existing tabs (like the default welcome/code editor tab)
-            const existingTabs = [...this.app.tabs]
-            terminalService.openTab(null, cwd, false).then((term: any) => {
-                if (term) {
-                    // Remove other tabs to show only the terminal
-                    for (const tab of existingTabs) {
-                        this.app.removeTab(tab)
-                    }
-                }
-            })
-        } catch (err) {
-            console.error('[tlink-studio] Failed to open terminal tab:', err)
         }
     }
 

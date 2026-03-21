@@ -8434,30 +8434,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private resolveTerminalService (): TerminalServiceType|null {
         const nodeRequire = this.getNodeRequire()
         if (!nodeRequire) {
-            console.warn('[tlink-studio] resolveTerminalService: nodeRequire not available')
             return null
         }
 
         try {
             const localModule = nodeRequire('tlink-local')
-            if (!localModule) {
-                console.warn('[tlink-studio] resolveTerminalService: tlink-local module not found')
-                return null
-            }
             const token = localModule?.TerminalService
             if (!token) {
-                console.warn('[tlink-studio] resolveTerminalService: TerminalService token not found in tlink-local. Available exports:', Object.keys(localModule))
                 return null
             }
-            const service = this.injector.get(token, null)
-            if (!service) {
-                console.warn('[tlink-studio] resolveTerminalService: TerminalService not found in Angular injector')
-                return null
-            }
-            console.info('[tlink-studio] resolveTerminalService: TerminalService resolved successfully')
-            return service
-        } catch (err) {
-            console.error('[tlink-studio] resolveTerminalService error:', err)
+            return this.injector.get(token, null)
+        } catch {
             return null
         }
     }
@@ -13840,7 +13827,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         doc.ansiDecorationIds = doc.model.deltaDecorations(doc.ansiDecorationIds ?? [], decorations)
     }
 
+    private ensureRunTerminalPending = false
+
     private async ensureRunTerminal (cwd: string): Promise<BaseTerminalTabComponentType | null> {
+        if (this.ensureRunTerminalPending) {
+            return this.runTerminalTab ?? null
+        }
         const terminalService = this.resolveTerminalService()
         if (!terminalService) {
             return null
@@ -13849,9 +13841,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (existing?.parent) {
             return existing
         }
+        this.ensureRunTerminalPending = true
         const runProfile = await this.resolveRunProfile()
         const term = await terminalService.openTab(runProfile, cwd, false)
         if (!term) {
+            this.ensureRunTerminalPending = false
             return null
         }
         // Mark this terminal as a dedicated "Run in terminal" pane so the terminal plugin can
@@ -13871,6 +13865,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
         })
         await this.placeTerminalNextToEditor(term)
+        this.ensureRunTerminalPending = false
         return term
     }
 
@@ -13943,10 +13938,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
         const sessionChanged$ = terminal?.sessionChanged$
         if (sessionChanged$?.subscribe) {
+            let disposed = false
             const subscription = sessionChanged$.subscribe((session: any) => {
-                if (!session?.open) {
+                if (!session?.open || disposed) {
                     return
                 }
+                disposed = true
                 try {
                     if (typeof terminal.sendInput === 'function') {
                         terminal.sendInput(text)
@@ -13958,7 +13955,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 }
             })
             // Avoid leaking subscription if the session never comes up.
-            window.setTimeout(() => subscription.unsubscribe(), 5000)
+            window.setTimeout(() => {
+                if (!disposed) {
+                    disposed = true
+                    subscription.unsubscribe()
+                }
+            }, 5000)
             return
         }
 

@@ -222,10 +222,6 @@ ipcMain.on('app:open-ai-assistant-window', () => {
     application.openAIAssistantWindow()
 })
 
-ipcMain.on('app:open-terminal-window', (_event, cwd?: string) => {
-    void application.openTerminalWindow(cwd ?? undefined)
-})
-
 process.on('uncaughtException' as any, err => {
     console.log(err)
     application.broadcast('uncaughtException', err)
