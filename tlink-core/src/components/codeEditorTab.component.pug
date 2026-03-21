@@ -227,22 +227,8 @@
                                 rect(x='5.3', y='5.3', width='8.4', height='8.4', rx='1.3')
                     button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Delete selected', aria-label='Delete selected', (click)='removeSelectedTopologyItem()', [disabled]='!canDeleteSelectedTopology')
                         i.fa.fa-trash
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Undo', aria-label='Undo', (click)='runTopologyUndo()', [disabled]='!canUndoTopology')
-                        i.fa.fa-undo
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Redo', aria-label='Redo', (click)='runTopologyRedo()', [disabled]='!canRedoTopology')
-                        i.fa.fa-repeat
                     button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Restore snapshot', aria-label='Restore snapshot', (click)='restorePreviousTopologySnapshot()', [disabled]='!canRestoreTopologySnapshot')
                         i.fa.fa-history
-                    span.topology-sep(aria-hidden='true')
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Zoom out', aria-label='Zoom out', (click)='zoomTopologyOut()')
-                        i.fa.fa-search-minus
-                    span.topology-zoom-indicator {{topologyZoomLabel}}
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Zoom in', aria-label='Zoom in', (click)='zoomTopologyIn()')
-                        i.fa.fa-search-plus
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Fit to canvas', aria-label='Fit to canvas', (click)='fitTopologyToCanvas()')
-                        i.fa.fa-arrows-alt
-                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Reset view', aria-label='Reset view', (click)='resetTopologyViewport()')
-                        i.fa.fa-crosshairs
                     span.topology-hint Cmd/Ctrl/Shift-click to multi-select
                     span.topology-hint Drag empty canvas to select, scroll wheel to pan
                     span.topology-hint Right-click empty canvas for sticky note options
@@ -340,7 +326,7 @@
                                 .node-meta {{node.type}}
                                 span.topology-item-resize-handle(*ngIf='isTopologyNodeSelected(node.id)', (mousedown)='startTopologyNodeResize($event, node.id)', (click)='$event.stopPropagation()')
                         .topology-marquee(*ngIf='topologyMarqueeActive', [style.left.px]='topologyMarqueeLeftPx', [style.top.px]='topologyMarqueeTopPx', [style.width.px]='topologyMarqueeWidthPx', [style.height.px]='topologyMarqueeHeightPx')
-                        .topology-controls((mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()')
+                    .topology-controls((mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()')
                             button.topology-control-btn(type='button', title='Undo (Ctrl+Z)', [disabled]='!canUndoTopology', (click)='runTopologyUndo()')
                                 i.fas.fa-undo
                             button.topology-control-btn(type='button', title='Redo (Ctrl+Shift+Z)', [disabled]='!canRedoTopology', (click)='runTopologyRedo()')

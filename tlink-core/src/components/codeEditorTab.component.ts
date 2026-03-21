@@ -4788,99 +4788,193 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     async exportTopologyAsImage (): Promise<void> {
-        if (!this.topologyData || !this.topologyCanvas?.nativeElement) {
+        if (!this.topologyData) {
             return
         }
-        const viewport = this.topologyCanvas.nativeElement.querySelector('.topology-viewport') as HTMLElement | null
-        if (!viewport) {
+        const data = this.topologyData
+        const nodes = data.nodes || []
+        const links = data.links || []
+        const shapes = data.shapes || []
+        const texts = data.texts || []
+        if (!nodes.length && !shapes.length && !texts.length) {
             return
         }
-        const bounds = this.getTopologyViewportWorldBounds()
-        const padding = 40
-        const width = Math.max(200, bounds.maxX - bounds.minX + padding * 2)
-        const height = Math.max(200, bounds.maxY - bounds.minY + padding * 2)
 
-        // Save current transform
-        const oldZoom = this.topologyZoom
-        const oldPanX = this.topologyPanX
-        const oldPanY = this.topologyPanY
+        // Calculate bounds
+        const allX: number[] = []
+        const allY: number[] = []
+        for (const n of nodes) {
+            allX.push(n.x, n.x + (n.width || 176))
+            allY.push(n.y, n.y + (n.height || 72))
+        }
+        for (const s of shapes) {
+            allX.push(s.x, s.x + s.width)
+            allY.push(s.y, s.y + s.height)
+        }
+        for (const t of texts) {
+            allX.push(t.x, t.x + 120)
+            allY.push(t.y, t.y + 30)
+        }
+        const minX = Math.min(...allX)
+        const minY = Math.min(...allY)
+        const maxX = Math.max(...allX)
+        const maxY = Math.max(...allY)
+        const padding = 50
+        const width = Math.max(300, maxX - minX + padding * 2)
+        const height = Math.max(200, maxY - minY + padding * 2)
+        const offsetX = -minX + padding
+        const offsetY = -minY + padding
+        const scale = 2
 
-        // Set transform to fit content
-        this.topologyZoom = 1
-        this.topologyPanX = Math.round(-bounds.minX + padding)
-        this.topologyPanY = Math.round(-bounds.minY + padding)
-        this.cdr.markForCheck()
+        const canvas = document.createElement('canvas')
+        canvas.width = width * scale
+        canvas.height = height * scale
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+            return
+        }
+        ctx.scale(scale, scale)
 
-        // Wait for render
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        // Background
+        const bgColor = getComputedStyle(this.topologyCanvas?.nativeElement ?? document.body).backgroundColor || '#1e1e2e'
+        ctx.fillStyle = bgColor
+        ctx.fillRect(0, 0, width, height)
 
-        try {
-            const svgData = new XMLSerializer().serializeToString(
-                this.createExportSvg(viewport, width, height),
-            )
-            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-            const url = URL.createObjectURL(svgBlob)
-            const img = new Image()
-            img.onload = () => {
-                const canvas = document.createElement('canvas')
-                const scale = 2
-                canvas.width = width * scale
-                canvas.height = height * scale
-                const ctx = canvas.getContext('2d')
-                if (ctx) {
-                    ctx.scale(scale, scale)
-                    ctx.fillStyle = getComputedStyle(this.topologyCanvas!.nativeElement).backgroundColor || '#ffffff'
-                    ctx.fillRect(0, 0, width, height)
-                    ctx.drawImage(img, 0, 0, width, height)
-                }
-                canvas.toBlob(blob => {
-                    if (blob) {
-                        const a = document.createElement('a')
-                        a.href = URL.createObjectURL(blob)
-                        a.download = `${this.topologyData?.name || 'topology'}.png`
-                        a.click()
-                        URL.revokeObjectURL(a.href)
-                    }
-                }, 'image/png')
-                URL.revokeObjectURL(url)
+        // Draw grid
+        ctx.strokeStyle = 'rgba(128,128,128,0.08)'
+        ctx.lineWidth = 1
+        for (let x = 0; x < width; x += 24) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke()
+        }
+        for (let y = 0; y < height; y += 24) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke()
+        }
+
+        // Helper: get node/shape center
+        const getCenter = (id: string | undefined, kind: string | undefined): { x: number, y: number } | null => {
+            if (kind === 'shape' || (!kind && shapes.find(s => s.id === id))) {
+                const s = shapes.find(s => s.id === id)
+                if (s) return { x: s.x + s.width / 2 + offsetX, y: s.y + s.height / 2 + offsetY }
             }
-            img.src = url
-        } finally {
-            // Restore transform
-            this.topologyZoom = oldZoom
-            this.topologyPanX = oldPanX
-            this.topologyPanY = oldPanY
-            this.cdr.markForCheck()
+            const n = nodes.find(n => n.id === id)
+            if (n) return { x: n.x + (n.width || 176) / 2 + offsetX, y: n.y + (n.height || 72) / 2 + offsetY }
+            return null
         }
-    }
 
-    private createExportSvg (viewport: HTMLElement, width: number, height: number): SVGSVGElement {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        svg.setAttribute('width', String(width))
-        svg.setAttribute('height', String(height))
-        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-        const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject')
-        fo.setAttribute('width', '100%')
-        fo.setAttribute('height', '100%')
-        const clone = viewport.cloneNode(true) as HTMLElement
-        clone.style.transform = viewport.style.transform
-        // Copy computed styles for all elements
-        const allStyles = document.querySelectorAll('style')
-        const styleEl = document.createElement('style')
-        let cssText = ''
-        allStyles.forEach(s => { cssText += s.textContent || '' })
-        styleEl.textContent = cssText
-        const wrapper = document.createElement('div')
-        wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
-        wrapper.style.width = `${width}px`
-        wrapper.style.height = `${height}px`
-        wrapper.style.position = 'relative'
-        wrapper.style.overflow = 'hidden'
-        wrapper.appendChild(styleEl)
-        wrapper.appendChild(clone)
-        fo.appendChild(wrapper)
-        svg.appendChild(fo)
-        return svg
+        // Draw links
+        for (const link of links) {
+            const from = getCenter(link.from, link.fromKind)
+            const to = getCenter(link.to, link.toKind)
+            if (!from || !to) continue
+            ctx.strokeStyle = link.color || '#888'
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.moveTo(from.x, from.y)
+            ctx.lineTo(to.x, to.y)
+            ctx.stroke()
+            // Arrow for directed
+            if (link.directed || link.bidirectional) {
+                const angle = Math.atan2(to.y - from.y, to.x - from.x)
+                const arrowLen = 10
+                ctx.fillStyle = link.color || '#888'
+                ctx.beginPath()
+                ctx.moveTo(to.x, to.y)
+                ctx.lineTo(to.x - arrowLen * Math.cos(angle - 0.4), to.y - arrowLen * Math.sin(angle - 0.4))
+                ctx.lineTo(to.x - arrowLen * Math.cos(angle + 0.4), to.y - arrowLen * Math.sin(angle + 0.4))
+                ctx.closePath()
+                ctx.fill()
+            }
+            if (link.bidirectional) {
+                const angle = Math.atan2(from.y - to.y, from.x - to.x)
+                const arrowLen = 10
+                ctx.fillStyle = link.color || '#888'
+                ctx.beginPath()
+                ctx.moveTo(from.x, from.y)
+                ctx.lineTo(from.x - arrowLen * Math.cos(angle - 0.4), from.y - arrowLen * Math.sin(angle - 0.4))
+                ctx.lineTo(from.x - arrowLen * Math.cos(angle + 0.4), from.y - arrowLen * Math.sin(angle + 0.4))
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+
+        // Draw shapes
+        for (const shape of shapes) {
+            const sx = shape.x + offsetX
+            const sy = shape.y + offsetY
+            ctx.strokeStyle = shape.color || '#06b6d4'
+            ctx.lineWidth = 2
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.08)'
+            if (shape.kind === 'circle' || shape.kind === 'oval') {
+                ctx.beginPath()
+                ctx.ellipse(sx + shape.width / 2, sy + shape.height / 2, shape.width / 2, shape.height / 2, 0, 0, Math.PI * 2)
+                ctx.fill()
+                ctx.stroke()
+            } else {
+                ctx.fillRect(sx, sy, shape.width, shape.height)
+                ctx.strokeRect(sx, sy, shape.width, shape.height)
+            }
+            if (shape.label) {
+                ctx.fillStyle = shape.color || '#06b6d4'
+                ctx.font = '12px Inter, sans-serif'
+                ctx.textAlign = 'center'
+                ctx.fillText(shape.label, sx + shape.width / 2, sy + shape.height / 2 + 4, shape.width - 8)
+            }
+        }
+
+        // Draw nodes
+        for (const node of nodes) {
+            const nx = node.x + offsetX
+            const ny = node.y + offsetY
+            const nw = node.width || 176
+            const nh = node.height || 72
+            const nodeColor = node.color || '#8b5cf6'
+            // Node box
+            ctx.fillStyle = bgColor
+            ctx.strokeStyle = nodeColor
+            ctx.lineWidth = 2
+            const r = 8
+            ctx.beginPath()
+            ctx.moveTo(nx + r, ny)
+            ctx.lineTo(nx + nw - r, ny)
+            ctx.quadraticCurveTo(nx + nw, ny, nx + nw, ny + r)
+            ctx.lineTo(nx + nw, ny + nh - r)
+            ctx.quadraticCurveTo(nx + nw, ny + nh, nx + nw - r, ny + nh)
+            ctx.lineTo(nx + r, ny + nh)
+            ctx.quadraticCurveTo(nx, ny + nh, nx, ny + nh - r)
+            ctx.lineTo(nx, ny + r)
+            ctx.quadraticCurveTo(nx, ny, nx + r, ny)
+            ctx.closePath()
+            ctx.fill()
+            ctx.stroke()
+            // Label
+            ctx.fillStyle = '#e0e0e0'
+            ctx.font = 'bold 13px Inter, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText(node.label || node.id, nx + nw / 2, ny + nh / 2 - 4, nw - 16)
+            // Type
+            ctx.fillStyle = '#888'
+            ctx.font = '10px Inter, sans-serif'
+            ctx.fillText(node.type || '', nx + nw / 2, ny + nh / 2 + 12, nw - 16)
+        }
+
+        // Draw text labels
+        for (const t of texts) {
+            ctx.fillStyle = t.sticky ? '#fef3c7' : (t.color || '#ccc')
+            ctx.font = '12px Inter, sans-serif'
+            ctx.textAlign = 'left'
+            ctx.fillText(t.text || '', t.x + offsetX, t.y + offsetY + 14, 300)
+        }
+
+        // Download
+        canvas.toBlob(blob => {
+            if (blob) {
+                const a = document.createElement('a')
+                a.href = URL.createObjectURL(blob)
+                a.download = `${data.name || 'topology'}.png`
+                a.click()
+                URL.revokeObjectURL(a.href)
+            }
+        }, 'image/png')
     }
 
     fitTopologyToCanvas (): void {
