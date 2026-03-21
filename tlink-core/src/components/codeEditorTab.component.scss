@@ -636,6 +636,41 @@
         animation: pulse 2s ease-in-out infinite;
     }
 
+    .git-indicator {
+        font-size: 9px;
+        font-weight: 700;
+        flex-shrink: 0;
+        width: 14px;
+        text-align: center;
+        border-radius: 3px;
+        line-height: 14px;
+        color: #e8ab3a;
+        background: rgba(232, 171, 58, 0.12);
+        margin-left: auto;
+
+        &.git-staged {
+            color: #4caf50;
+            background: rgba(76, 175, 80, 0.12);
+        }
+
+        &.git-untracked {
+            color: #9e9e9e;
+            background: rgba(158, 158, 158, 0.1);
+        }
+    }
+
+    &.git-modified > .name {
+        color: #e8ab3a;
+    }
+
+    &.git-staged > .name {
+        color: #4caf50;
+    }
+
+    &.git-untracked > .name {
+        color: #9e9e9e;
+    }
+
     @keyframes pulse {
         0%, 100% {
             opacity: 1;
@@ -1278,6 +1313,70 @@
     pointer-events: none;
     z-index: 9;
     border-radius: 4px;
+}
+
+.topology-controls {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-bg-less);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    z-index: 10;
+    user-select: none;
+
+    .topology-control-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--theme-fg);
+        font-size: 12px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+
+        &:hover:not(:disabled) {
+            background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.15);
+            color: var(--theme-accent);
+        }
+
+        &.active {
+            background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.18);
+            color: var(--theme-accent);
+        }
+
+        &:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+    }
+
+    .topology-controls-separator {
+        width: 1px;
+        height: 18px;
+        background: var(--theme-bg-less);
+        margin: 0 4px;
+        flex-shrink: 0;
+    }
+
+    .topology-zoom-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--theme-fg-less);
+        min-width: 36px;
+        text-align: center;
+        user-select: none;
+    }
 }
 
 .topology-node {

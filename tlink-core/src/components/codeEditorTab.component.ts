@@ -28,6 +28,7 @@ interface EditorDocumentSnapshot {
     insertSpaces: boolean
     isDirty?: boolean
     lastSavedValue?: string
+    viewState?: any
 }
 
 interface EditorDocument extends EditorDocumentSnapshot {
@@ -337,6 +338,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyNewLinksDirected = false
     topologyNewLinksBidirectional = false
     topologyCurvedLinks = true
+    topologySnapToGrid = false
+    private topologyGridSize = 24
     topologyZoom = 1
     topologyPanX = 0
     topologyPanY = 0
@@ -388,6 +391,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private folderTreeModes = new Map<string, FolderTreeMode>()
     private _treeItems: Array<{ node: TreeNode, depth: number }> = []
     private _visibleTreeItems: Array<{ node: TreeNode, depth: number }> = []
+    gitFileStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
+    private gitStatusTimer?: number
+    private gitStatusRefreshMs = 5000
     private treeKeyboardActive = false
     private canCloseCheckPromise: Promise<boolean>|null = null
     private confirmedCloseDiscardSignature: string|null = null
@@ -510,6 +516,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private fileMenuHoverCloseTimer?: number
     private editMenuHoverCloseTimer?: number
     private readonly menuHoverCloseDelayMs = 140
+    private editorViewStates = new Map<string, any>()
     private treeBuildNonce = 0
     private deletingPathKeys = new Set<string>()
     private deleteInProgress = false
@@ -4771,6 +4778,111 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
+    toggleTopologySnapToGrid (): void {
+        this.topologySnapToGrid = !this.topologySnapToGrid
+        this.cdr.markForCheck()
+    }
+
+    private snapToGrid (value: number): number {
+        return Math.round(value / this.topologyGridSize) * this.topologyGridSize
+    }
+
+    async exportTopologyAsImage (): Promise<void> {
+        if (!this.topologyData || !this.topologyCanvas?.nativeElement) {
+            return
+        }
+        const viewport = this.topologyCanvas.nativeElement.querySelector('.topology-viewport') as HTMLElement | null
+        if (!viewport) {
+            return
+        }
+        const bounds = this.getTopologyViewportWorldBounds()
+        const padding = 40
+        const width = Math.max(200, bounds.maxX - bounds.minX + padding * 2)
+        const height = Math.max(200, bounds.maxY - bounds.minY + padding * 2)
+
+        // Save current transform
+        const oldZoom = this.topologyZoom
+        const oldPanX = this.topologyPanX
+        const oldPanY = this.topologyPanY
+
+        // Set transform to fit content
+        this.topologyZoom = 1
+        this.topologyPanX = Math.round(-bounds.minX + padding)
+        this.topologyPanY = Math.round(-bounds.minY + padding)
+        this.cdr.markForCheck()
+
+        // Wait for render
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+        try {
+            const svgData = new XMLSerializer().serializeToString(
+                this.createExportSvg(viewport, width, height),
+            )
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+            const url = URL.createObjectURL(svgBlob)
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                const scale = 2
+                canvas.width = width * scale
+                canvas.height = height * scale
+                const ctx = canvas.getContext('2d')
+                if (ctx) {
+                    ctx.scale(scale, scale)
+                    ctx.fillStyle = getComputedStyle(this.topologyCanvas!.nativeElement).backgroundColor || '#ffffff'
+                    ctx.fillRect(0, 0, width, height)
+                    ctx.drawImage(img, 0, 0, width, height)
+                }
+                canvas.toBlob(blob => {
+                    if (blob) {
+                        const a = document.createElement('a')
+                        a.href = URL.createObjectURL(blob)
+                        a.download = `${this.topologyData?.name || 'topology'}.png`
+                        a.click()
+                        URL.revokeObjectURL(a.href)
+                    }
+                }, 'image/png')
+                URL.revokeObjectURL(url)
+            }
+            img.src = url
+        } finally {
+            // Restore transform
+            this.topologyZoom = oldZoom
+            this.topologyPanX = oldPanX
+            this.topologyPanY = oldPanY
+            this.cdr.markForCheck()
+        }
+    }
+
+    private createExportSvg (viewport: HTMLElement, width: number, height: number): SVGSVGElement {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('width', String(width))
+        svg.setAttribute('height', String(height))
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+        const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject')
+        fo.setAttribute('width', '100%')
+        fo.setAttribute('height', '100%')
+        const clone = viewport.cloneNode(true) as HTMLElement
+        clone.style.transform = viewport.style.transform
+        // Copy computed styles for all elements
+        const allStyles = document.querySelectorAll('style')
+        const styleEl = document.createElement('style')
+        let cssText = ''
+        allStyles.forEach(s => { cssText += s.textContent || '' })
+        styleEl.textContent = cssText
+        const wrapper = document.createElement('div')
+        wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+        wrapper.style.width = `${width}px`
+        wrapper.style.height = `${height}px`
+        wrapper.style.position = 'relative'
+        wrapper.style.overflow = 'hidden'
+        wrapper.appendChild(styleEl)
+        wrapper.appendChild(clone)
+        fo.appendChild(wrapper)
+        svg.appendChild(fo)
+        return svg
+    }
+
     fitTopologyToCanvas (): void {
         if (!this.topologyData || !this.topologyCanvas?.nativeElement) {
             this.resetTopologyViewport()
@@ -6374,11 +6486,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             viewport.minY + 8,
             Math.min(viewport.maxY - size.height - 8, point.y - this.topologyDragOffsetY),
         )
-        if (nextX === node.x && nextY === node.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === node.x && snappedY === node.y) {
             return false
         }
-        node.x = nextX
-        node.y = nextY
+        node.x = snappedX
+        node.y = snappedY
         this.topologyDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -6434,11 +6548,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const nextY = item.sticky
             ? point.y - this.topologyTextDragOffsetY
             : Math.max(viewport.minY + 8, Math.min(viewport.maxY - 24, point.y - this.topologyTextDragOffsetY))
-        if (nextX === item.x && nextY === item.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === item.x && snappedY === item.y) {
             return false
         }
-        item.x = nextX
-        item.y = nextY
+        item.x = snappedX
+        item.y = snappedY
         this.topologyTextDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -6488,11 +6604,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const viewport = this.getTopologyViewportWorldBounds()
         const nextX = Math.max(viewport.minX + 8, Math.min(viewport.maxX - shape.width - 8, point.x - this.topologyShapeDragOffsetX))
         const nextY = Math.max(viewport.minY + 8, Math.min(viewport.maxY - shape.height - 8, point.y - this.topologyShapeDragOffsetY))
-        if (nextX === shape.x && nextY === shape.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === shape.x && snappedY === shape.y) {
             return false
         }
-        shape.x = nextX
-        shape.y = nextY
+        shape.x = snappedX
+        shape.y = snappedY
         this.topologyShapeDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -8076,6 +8194,88 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }, delay)
     }
 
+    startGitStatusRefresh (): void {
+        if (this.gitStatusTimer) {
+            return
+        }
+        void this.refreshGitStatus()
+        this.gitStatusTimer = window.setInterval(() => {
+            void this.refreshGitStatus()
+        }, this.gitStatusRefreshMs)
+    }
+
+    stopGitStatusRefresh (): void {
+        if (this.gitStatusTimer) {
+            clearInterval(this.gitStatusTimer)
+            this.gitStatusTimer = undefined
+        }
+    }
+
+    private async refreshGitStatus (): Promise<void> {
+        const folders = Array.from(this.expandedFolders).concat(
+            this.documents.filter(d => d.path).map(d => path.dirname(d.path!)),
+        )
+        const roots = new Set<string>()
+        for (const folder of folders) {
+            if (folder) {
+                roots.add(folder)
+            }
+        }
+        if (!roots.size) {
+            if (this.gitFileStatuses.size) {
+                this.gitFileStatuses.clear()
+                this.cdr.markForCheck()
+            }
+            return
+        }
+        try {
+            const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer
+            if (!ipcRenderer) {
+                return
+            }
+            const nextStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
+            const checkedRoots = new Set<string>()
+            for (const folder of roots) {
+                if (checkedRoots.has(folder)) {
+                    continue
+                }
+                checkedRoots.add(folder)
+                const result = await ipcRenderer.invoke('terminal-context:get-git-status', folder)
+                if (!result) {
+                    continue
+                }
+                // Find git root for resolving relative paths
+                let gitRoot = folder
+                try {
+                    const { execSync } = (window as any).require('child_process')
+                    gitRoot = execSync('git rev-parse --show-toplevel', { cwd: folder, encoding: 'utf8' }).trim()
+                } catch {
+                    // Use folder as fallback
+                }
+                for (const file of (result.staged || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'staged')
+                }
+                for (const file of (result.modified || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'modified')
+                }
+                for (const file of (result.untracked || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'untracked')
+                }
+            }
+            this.gitFileStatuses = nextStatuses
+            this.cdr.markForCheck()
+        } catch {
+            // Git not available
+        }
+    }
+
+    getGitStatus (filePath: string | null): string | null {
+        if (!filePath) {
+            return null
+        }
+        return this.gitFileStatuses.get(filePath) ?? null
+    }
+
     private async rebuildTreeItems (buildNonce: number): Promise<void> {
         const { roots, truncated } = await this.buildTree(buildNonce)
         if (buildNonce !== this.treeBuildNonce) {
@@ -8263,11 +8463,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         window.setTimeout(() => {
             this.updateTreeItems()
             this.updateVisibleTreeItems(true)
+            this.startGitStatusRefresh()
             this.cdr.markForCheck()
         }, 0)
     }
 
     ngOnDestroy (): void {
+        this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
             clearTimeout(this.persistFoldersTimer)
@@ -10514,13 +10716,32 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.viewMode = 'editor'
         this.statusMessage = ''
         if (this.splitEditor && this.focusedEditor === 'split') {
+            // Save outgoing view state
+            if (this.splitDocId) {
+                const vs = this.splitEditor.saveViewState?.()
+                if (vs) {
+                    this.editorViewStates.set(this.splitDocId, vs)
+                }
+            }
             this.splitDocId = docId
             this.splitEditor.setModel(doc.model)
+            // Restore incoming view state
+            const savedVs = this.editorViewStates.get(docId)
+            if (savedVs) {
+                this.splitEditor.restoreViewState?.(savedVs)
+            }
             this.setModelLanguage(doc)
             this.updateStatus()
             this.syncTopologyForActiveDoc()
             this.persistState()
             return
+        }
+        // Save outgoing view state
+        if (this.activeDocId && this.primaryEditor) {
+            const vs = this.primaryEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.activeDocId, vs)
+            }
         }
         this.activeDocId = docId
         this.refreshActiveDocCache()
@@ -10528,6 +10749,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.pendingDiffDocId = null
         }
         this.primaryEditor?.setModel(doc.model)
+        // Restore incoming view state
+        const savedVs = this.editorViewStates.get(docId)
+        if (savedVs && this.primaryEditor) {
+            this.primaryEditor.restoreViewState?.(savedVs)
+        }
         if (!this.splitDocId) {
             this.splitEditor?.setModel(doc.model)
         }
@@ -10731,10 +10957,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         model.setEOL(snapshot.eol === 'CRLF' ? this.monaco.editor.EndOfLineSequence.CRLF : this.monaco.editor.EndOfLineSequence.LF)
         model.updateOptions({ tabSize: snapshot.tabSize, insertSpaces: snapshot.insertSpaces })
         const folderPath = snapshot.folderPath ?? (snapshot.path ? path.dirname(snapshot.path) : null)
+        const docId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
         const doc: EditorDocument = {
             ...snapshot,
             folderPath,
-            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            id: docId,
             model,
             modelDisposables: [],
             isDirty: snapshot.isDirty ?? false,
@@ -10743,6 +10970,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             diskMtimeMs: null,
             diskSize: null,
             externalConflict: null,
+        }
+        // Restore saved view state (cursor/scroll position) if available
+        if (snapshot.viewState) {
+            this.editorViewStates.set(docId, snapshot.viewState)
         }
         // Track listener subscriptions for explicit disposal to prevent leaks.
         // Guard callbacks: if the model fires during disposal, bail out.
@@ -11000,6 +11231,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             insertSpaces: doc.insertSpaces,
             isDirty: doc.isDirty,
             lastSavedValue: doc.lastSavedValue,
+            viewState: this.editorViewStates.get(doc.id) ?? null,
         }
     }
 
@@ -12311,6 +12543,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private persistState (): void {
+        // Save current editor view states before snapshotting
+        if (this.activeDocId && this.primaryEditor) {
+            const vs = this.primaryEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.activeDocId, vs)
+            }
+        }
+        if (this.splitDocId && this.splitEditor) {
+            const vs = this.splitEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.splitDocId, vs)
+            }
+        }
         this.syncOpenedFileScopes()
         // Flush any pending debounced folder write so that
         // the full state snapshot is consistent.
