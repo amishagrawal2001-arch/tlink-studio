@@ -74,11 +74,32 @@
                 | {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
             .toolbar-separator
             .menu-container
-                button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics') Diagnostics
+                button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics')
+                    | Diagnostics
+                    span.diag-badge.badge-error(*ngIf='diagnosticsMarkerSummary.errors > 0') {{diagnosticsMarkerSummary.errors}}
+                    span.diag-badge.badge-warning(*ngIf='diagnosticsMarkerSummary.warnings > 0') {{diagnosticsMarkerSummary.warnings}}
                 .dropdown-menu.diagnostics-panel(*ngIf='showDiagnostics', (click)='$event.stopPropagation()')
-                    .diagnostics-row(*ngFor='let item of diagnosticsItems')
-                        span.label {{item.label}}
-                        code.value {{item.value}}
+                    .diag-tabs
+                        button.diag-tab(type='button', [class.active]='diagnosticsTab === "markers"', (click)='setDiagnosticsTab("markers")')
+                            | Problems
+                            span.diag-tab-count(*ngIf='editorMarkers.length') {{editorMarkers.length}}
+                        button.diag-tab(type='button', [class.active]='diagnosticsTab === "info"', (click)='setDiagnosticsTab("info")') File Info
+                    .diag-content
+                        .diag-markers(*ngIf='diagnosticsTab === "markers"')
+                            .diag-empty(*ngIf='editorMarkers.length === 0')
+                                i.fas.fa-check-circle
+                                span No problems detected
+                            .diag-marker(*ngFor='let marker of editorMarkers', (click)='goToMarker(marker)', [class]='marker.severity')
+                                i.fas([ngClass]='{"fa-times-circle": marker.severity === "error", "fa-exclamation-triangle": marker.severity === "warning", "fa-info-circle": marker.severity === "info" || marker.severity === "hint"}')
+                                .diag-marker-body
+                                    .diag-marker-msg {{marker.message}}
+                                    .diag-marker-loc
+                                        span.diag-marker-source(*ngIf='marker.source') {{marker.source}}
+                                        span Ln {{marker.line}}, Col {{marker.column}}
+                        .diag-info(*ngIf='diagnosticsTab === "info"')
+                            .diagnostics-row(*ngFor='let item of diagnosticsItems')
+                                span.label {{item.label}}
+                                code.value {{item.value}}
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleSplitView()', [class.active]='!!splitEditor', [disabled]='viewMode==="diff"') Split
             button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleAutosave()', [class.active]='autosaveEnabled') Autosave
             .toolbar-separator

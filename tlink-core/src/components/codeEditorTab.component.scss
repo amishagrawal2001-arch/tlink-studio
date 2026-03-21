@@ -144,6 +144,28 @@
         font-weight: 700;
     }
 
+    .diag-badge {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 700;
+        border-radius: 8px;
+        padding: 0 5px;
+        margin-left: 4px;
+        min-width: 16px;
+        text-align: center;
+        line-height: 16px;
+        vertical-align: middle;
+
+        &.badge-error {
+            background: #e53935;
+            color: #fff;
+        }
+        &.badge-warning {
+            background: #fb8c00;
+            color: #fff;
+        }
+    }
+
     .form-select-sm {
         width: auto;
         min-width: 80px;
@@ -204,11 +226,128 @@
             }
 
             &.diagnostics-panel {
-                min-width: 360px;
+                min-width: 400px;
                 max-width: min(64vw, 760px);
-                gap: 4px;
-                padding: 8px;
+                max-height: 420px;
+                gap: 0;
+                padding: 0;
                 cursor: default;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+
+                .diag-tabs {
+                    display: flex;
+                    border-bottom: 1px solid rgba(127, 127, 127, 0.2);
+                    padding: 0 4px;
+                    flex-shrink: 0;
+
+                    .diag-tab {
+                        background: none;
+                        border: none;
+                        padding: 7px 14px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: var(--theme-fg-less);
+                        cursor: pointer;
+                        border-bottom: 2px solid transparent;
+                        transition: color 0.15s, border-color 0.15s;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+
+                        &:hover { color: var(--theme-fg); }
+                        &.active {
+                            color: var(--theme-accent, #2e7ce8);
+                            border-bottom-color: var(--theme-accent, #2e7ce8);
+                        }
+
+                        .diag-tab-count {
+                            background: rgba(127, 127, 127, 0.15);
+                            border-radius: 8px;
+                            padding: 0 6px;
+                            font-size: 10px;
+                            min-width: 18px;
+                            text-align: center;
+                        }
+                    }
+                }
+
+                .diag-content {
+                    overflow-y: auto;
+                    flex: 1 1 auto;
+                    padding: 6px;
+                }
+
+                .diag-empty {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 16px 8px;
+                    color: var(--theme-fg-less);
+                    font-size: 12px;
+
+                    i { color: #4caf50; font-size: 16px; }
+                }
+
+                .diag-markers {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .diag-marker {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 8px;
+                    padding: 5px 8px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: background 0.12s;
+
+                    &:hover { background: rgba(127, 127, 127, 0.1); }
+
+                    > i {
+                        margin-top: 2px;
+                        flex-shrink: 0;
+                        font-size: 12px;
+                    }
+
+                    &.error > i { color: #e53935; }
+                    &.warning > i { color: #fb8c00; }
+                    &.info > i, &.hint > i { color: #2196f3; }
+
+                    .diag-marker-body {
+                        min-width: 0;
+                        flex: 1;
+                    }
+
+                    .diag-marker-msg {
+                        color: var(--theme-fg);
+                        word-break: break-word;
+                        line-height: 1.35;
+                    }
+
+                    .diag-marker-loc {
+                        color: var(--theme-fg-less);
+                        font-size: 10px;
+                        margin-top: 2px;
+                        display: flex;
+                        gap: 8px;
+
+                        .diag-marker-source {
+                            font-weight: 600;
+                        }
+                    }
+                }
+
+                .diag-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    padding: 4px 2px;
+                }
 
                 .diagnostics-row {
                     display: grid;

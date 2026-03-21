@@ -316,6 +316,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     fileMenuOpen = false
     editMenuOpen = false
     showDiagnostics = false
+    diagnosticsTab: 'markers'|'info' = 'markers'
+    editorMarkers: Array<{ severity: string, message: string, line: number, column: number, source: string }> = []
+    private markerDisposable: any = null
     topologyCanvasMode = false
     topologyData: TopologyDocumentModel|null = null
     topologyParseError = ''
@@ -10327,13 +10330,83 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         event?.preventDefault()
         event?.stopPropagation()
         this.showDiagnostics = !this.showDiagnostics
+        if (this.showDiagnostics) {
+            this.refreshMarkers()
+        }
+    }
+
+    setDiagnosticsTab (tab: 'markers'|'info'): void {
+        this.diagnosticsTab = tab
+        if (tab === 'markers') {
+            this.refreshMarkers()
+        }
+    }
+
+    refreshMarkers (): void {
+        if (!this.monaco) { return }
+        const doc = this.cachedActiveDoc
+        if (!doc?.model) {
+            this.editorMarkers = []
+            return
+        }
+        const markers = this.monaco.editor.getModelMarkers({ resource: doc.model.uri })
+        this.editorMarkers = markers.map((m: any) => ({
+            severity: m.severity === 8 ? 'error' : m.severity === 4 ? 'warning' : m.severity === 2 ? 'hint' : 'info',
+            message: m.message,
+            line: m.startLineNumber,
+            column: m.startColumn,
+            source: m.source || '',
+        }))
+    }
+
+    private setupMarkerListener (): void {
+        if (this.markerDisposable) {
+            this.markerDisposable.dispose()
+            this.markerDisposable = null
+        }
+        if (!this.monaco) { return }
+        this.markerDisposable = this.monaco.editor.onDidChangeMarkers?.((uris: any[]) => {
+            const doc = this.cachedActiveDoc
+            if (!doc?.model) { return }
+            const docUri = doc.model.uri.toString()
+            if (uris.some((u: any) => u.toString() === docUri)) {
+                this.refreshMarkers()
+            }
+        })
+    }
+
+    get diagnosticsMarkerSummary (): { errors: number, warnings: number, infos: number } {
+        let errors = 0; let warnings = 0; let infos = 0
+        for (const m of this.editorMarkers) {
+            if (m.severity === 'error') { errors++ }
+            else if (m.severity === 'warning') { warnings++ }
+            else { infos++ }
+        }
+        return { errors, warnings, infos }
+    }
+
+    goToMarker (marker: { line: number, column: number }): void {
+        const editor = this.focusedEditor === 'split' ? this.splitEditor : this.primaryEditor
+        if (!editor) { return }
+        editor.revealLineInCenter(marker.line)
+        editor.setPosition({ lineNumber: marker.line, column: marker.column })
+        editor.focus()
     }
 
     get diagnosticsItems (): Array<{ label: string, value: string }> {
         const loadedPlugins = this.getLoadedPluginNames()
         const selectedFiles = this.getSelectedFilePathsFromTree().length
         const selectedFolders = this.getSelectedFolderPathsFromTree().length
+        const doc = this.cachedActiveDoc
+        const model = doc?.model
+        const lineCount = model?.getLineCount?.() ?? 0
+        const charCount = model?.getValueLength?.() ?? 0
+        const lang = model ? (this.monaco?.editor?.getModelLanguageId?.(model) ?? 'unknown') : '(none)'
         return [
+            { label: 'Language', value: lang },
+            { label: 'Lines', value: String(lineCount) },
+            { label: 'Characters', value: String(charCount) },
+            { label: 'Encoding', value: 'UTF-8' },
             { label: 'State file', value: this.getEditorStateFilePath() },
             { label: 'Workspace root', value: path.resolve(this.folderRoot) },
             { label: 'Selected folder', value: this.selectedFolderPath ?? '(none)' },
@@ -10945,6 +11018,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.primaryEditor.onDidChangeCursorPosition(() => {
                 this.updateStatus()
             })
+
+            this.setupMarkerListener()
 
             await this.restoreState()
             // Immediately re-persist so any stale/deleted docs that were
