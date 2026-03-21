@@ -1,0 +1,16 @@
+diff --git a/node_modules/electron-debug/index.js b/node_modules/electron-debug/index.js
+index 5f4608c..44254ff 100644
+--- a/node_modules/electron-debug/index.js
++++ b/node_modules/electron-debug/index.js
+@@ -55,6 +55,11 @@ function inspectElements() {
+ 
+ const addExtensionIfInstalled = (name, getPath) => {
+ 	const isExtensionInstalled = name => {
++		// Electron >=34: session.getAllExtensions() was moved to session.extensions.getAllExtensions()
++		if (session.defaultSession.extensions?.getAllExtensions) {
++			return {}.hasOwnProperty.call(session.defaultSession.extensions.getAllExtensions(), name);
++		}
++
+ 		// For Electron >=9.
+ 		if (session.defaultSession.getAllExtensions) {
+ 			return {}.hasOwnProperty.call(session.defaultSession.getAllExtensions(), name);

@@ -1,0 +1,1018 @@
+import { app, ipcMain, Menu, Tray, shell, screen, globalShortcut, MenuItemConstructorOptions, WebContents, nativeImage } from 'electron'
+import promiseIpc from 'electron-promise-ipc'
+import * as remote from '@electron/remote/main'
+import { exec } from 'mz/child_process'
+import * as path from 'path'
+import * as fs from 'fs'
+import * as yaml from 'js-yaml'
+import { Subject, throttleTime } from 'rxjs'
+
+import { saveConfig } from './config'
+import { writeFile } from 'atomically'
+import { Window, WindowOptions } from './window'
+import { pluginManager } from './pluginManager'
+import { PTYManager } from './pty'
+import { getSessionSharingServer } from './sessionSharingServer'
+
+/* eslint-disable block-scoped-var */
+
+try {
+    var wnr = require('windows-native-registry') // eslint-disable-line @typescript-eslint/no-var-requires, no-var
+} catch (_) { }
+
+export class Application {
+    private tray?: Tray
+    private ptyManager = new PTYManager()
+    private sessionSharingServer = getSessionSharingServer()
+    private windows: Window[] = []
+    private aiAssistantWindow: Window | null = null
+    private codeEditorWindow: Window | null = null
+    private globalHotkey$ = new Subject<void>()
+    private quitRequested = false
+    private readonly studioOnlyApp = (process.env.TLINK_STUDIO_APP ?? '1') === '1'
+    userPluginsPath: string
+
+    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+    constructor (private configStore: any) {
+        remote.initialize()
+        this.useBuiltinGraphics()
+        this.ptyManager.init(this)
+        this.initSessionSharing()
+
+        ipcMain.handle('app:save-config', async (event, config) => {
+            await saveConfig(config)
+            this.updateConfigStoreFromSerialized(config)
+            if (process.platform === 'darwin') {
+                this.setupMenu()
+            }
+            this.broadcastExcept('host:config-change', event.sender, config)
+        })
+
+        ipcMain.on('app:register-global-hotkey', (_event, specs) => {
+            globalShortcut.unregisterAll()
+            for (const spec of specs) {
+                globalShortcut.register(spec, () => this.globalHotkey$.next())
+            }
+        })
+
+        this.globalHotkey$.pipe(throttleTime(100)).subscribe(() => {
+            this.onGlobalHotkey()
+        })
+
+        ;(promiseIpc as any).on('plugin-manager:install', (name, version) => {
+            if (this.studioOnlyApp) {
+                throw new Error('Plugin installation is disabled in Studio-only mode')
+            }
+            return pluginManager.install(this.userPluginsPath, name, version)
+        })
+
+        ;(promiseIpc as any).on('plugin-manager:uninstall', (name) => {
+            if (this.studioOnlyApp) {
+                throw new Error('Plugin uninstallation is disabled in Studio-only mode')
+            }
+            return pluginManager.uninstall(this.userPluginsPath, name)
+        })
+
+        ;(promiseIpc as any).on('get-default-mac-shell', async () => {
+            try {
+                return (await exec(`/usr/bin/dscl . -read /Users/${process.env.LOGNAME} UserShell`))[0].toString().split(' ')[1].trim()
+            } catch {
+                return '/bin/bash'
+            }
+        })
+
+        // IPC handler: Get git status for a directory
+        ipcMain.handle('terminal-context:get-git-status', async (_event, directory: string) => {
+            try {
+                if (!directory || !fs.existsSync(directory)) {
+                    return null
+                }
+
+                // Check if directory is a git repository by trying to get root
+                try {
+                    const rootResult = await exec('git rev-parse --show-toplevel', { cwd: directory })
+                    const gitRoot = rootResult[0].toString().trim()
+                    if (!gitRoot || !fs.existsSync(gitRoot)) {
+                        return null
+                    }
+                } catch {
+                    // Not a git repository
+                    return null
+                }
+
+                const results: any = {
+                    clean: true,
+                    modified: [],
+                    untracked: [],
+                    staged: [],
+                }
+
+                // Get current branch
+                try {
+                    const branchResult = await exec('git rev-parse --abbrev-ref HEAD', { cwd: directory })
+                    results.branch = branchResult[0].toString().trim()
+                } catch {
+                    results.branch = undefined
+                }
+
+                // Get commit hash
+                try {
+                    const commitResult = await exec('git rev-parse --short HEAD', { cwd: directory })
+                    results.commit = commitResult[0].toString().trim()
+                } catch {
+                    results.commit = undefined
+                }
+
+                // Get remote info
+                try {
+                    const remoteResult = await exec('git remote -v', { cwd: directory })
+                    const remoteLines = remoteResult[0].toString().trim().split('\n')
+                    if (remoteLines.length > 0 && remoteLines[0]) {
+                        const [name, url] = remoteLines[0].split(/\s+/)
+                        results.remote = { name, url }
+                    }
+                } catch {
+                    results.remote = undefined
+                }
+
+                // Get git status
+                try {
+                    const statusResult = await exec('git status --porcelain', { cwd: directory })
+                    const statusLines = statusResult[0].toString().trim().split('\n').filter(line => line.trim())
+                    const stagedStatuses = new Set(['M', 'A', 'D', 'R'])
+                    const modifiedStatuses = new Set(['M', 'D'])
+
+                    for (const line of statusLines) {
+                        if (!line.trim()) {
+                            continue
+                        }
+
+                        const status = line.slice(0, 2)
+                        const file = line.slice(3).trim()
+
+                        // Handle untracked files
+                        if (status.startsWith('??')) {
+                            results.untracked.push(file)
+                            continue
+                        }
+
+                        const indexStatus = status.charAt(0)
+                        const worktreeStatus = status.charAt(1)
+
+                        // Staged changes (index status)
+                        if (indexStatus !== ' ' && indexStatus !== '?' && stagedStatuses.has(indexStatus)) {
+                            results.staged.push(file)
+                        }
+
+                        // Working tree changes
+                        if (worktreeStatus !== ' ' && worktreeStatus !== '?' && modifiedStatuses.has(worktreeStatus)) {
+                            results.modified.push(file)
+                        }
+                    }
+
+                    results.clean = statusLines.length === 0
+                } catch {
+                    // Git status failed, assume clean
+                }
+
+                return results
+            } catch (error: any) {
+                console.error('Failed to get git status:', error)
+                return null
+            }
+        })
+
+        // IPC handler: Get file system context for a directory
+        ipcMain.handle('terminal-context:get-file-system-context', async (_event, directory: string) => {
+            try {
+                if (!directory || !fs.existsSync(directory)) {
+                    return null
+                }
+
+                const stat = fs.statSync(directory)
+                if (!stat.isDirectory()) {
+                    return null
+                }
+
+                const entries: { name: string, type: 'file' | 'directory' | 'symlink', size?: number }[] = []
+
+                const files = fs.readdirSync(directory)
+                for (const file of files) {
+                    const filePath = path.join(directory, file)
+                    try {
+                        const fileStat = fs.lstatSync(filePath)
+                        const entry: any = {
+                            name: file,
+                            type: fileStat.isSymbolicLink() ? 'symlink' : fileStat.isDirectory() ? 'directory' : 'file',
+                        }
+                        if (entry.type === 'file') {
+                            entry.size = fileStat.size
+                        }
+                        entries.push(entry)
+                    } catch {
+                        // Skip files we can't access
+                        continue
+                    }
+                }
+
+                return {
+                    path: directory,
+                    entries,
+                    modifiedFiles: [], // Could be enhanced to track modified files
+                }
+            } catch (error: any) {
+                console.error('Failed to get file system context:', error)
+                return null
+            }
+        })
+
+        if (process.platform === 'linux') {
+            app.commandLine.appendSwitch('no-sandbox')
+            if ((this.configStore.appearance?.opacity || 1) !== 1) {
+                app.commandLine.appendSwitch('enable-transparent-visuals')
+                app.disableHardwareAcceleration()
+            }
+        }
+        if (this.configStore.hacks?.disableGPU) {
+            app.commandLine.appendSwitch('disable-gpu')
+            app.disableHardwareAcceleration()
+        }
+
+        this.userPluginsPath = path.join(
+            app.getPath('userData'),
+            'plugins',
+        )
+
+        if (!fs.existsSync(this.userPluginsPath)) {
+            fs.mkdirSync(this.userPluginsPath)
+        }
+
+        app.commandLine.appendSwitch('disable-http-cache')
+        app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
+        app.commandLine.appendSwitch('lang', 'EN')
+
+        for (const flag of this.configStore.flags || [['force_discrete_gpu', '0']]) {
+            app.commandLine.appendSwitch(flag[0], flag[1])
+        }
+
+        this.initBackup()
+
+        app.on('before-quit', () => {
+            this.sessionSharingServer.stop()
+            this.quitRequested = true
+        })
+
+        app.on('window-all-closed', () => {
+            if (this.quitRequested || process.platform !== 'darwin') {
+                app.quit()
+            }
+        })
+    }
+
+    /**
+     * Initialize session sharing server and IPC handlers
+     */
+    private initSessionSharing (): void {
+        // IPC handler: Get WebSocket server URL
+        ipcMain.handle('session-sharing:get-server-url', async (_event, usePublicUrl = false) => {
+            return this.sessionSharingServer.getWebSocketUrl(usePublicUrl)
+        })
+
+        // IPC handler: Register a shared session
+        // eslint-disable-next-line @typescript-eslint/max-params
+        ipcMain.handle('session-sharing:register', async (_event, sessionId: string, token: string, mode: string, password?: string, expiresIn?: number) => {
+            this.sessionSharingServer.registerSession(sessionId, token, mode as 'read-only' | 'interactive', password, expiresIn)
+        })
+
+        // IPC handler: Unregister a shared session
+        ipcMain.handle('session-sharing:unregister', async (_event, sessionId: string) => {
+            this.sessionSharingServer.unregisterSession(sessionId)
+        })
+
+        // IPC handler: Broadcast terminal output
+        ipcMain.on('session-sharing:broadcast-output', (_event, sessionId: string, data: Buffer) => {
+            this.sessionSharingServer.broadcastOutput(sessionId, Buffer.from(data))
+        })
+
+        // IPC handler: Forward input from viewer (interactive mode)
+        ipcMain.on('session-sharing:forward-input', (_event, sessionId: string, data: Buffer) => {
+            // Note: We'll need to get the terminal instance to write input
+            // For now, emit an event that can be handled
+            this.broadcast('session-sharing:terminal-input', sessionId, Buffer.from(data))
+        })
+
+        // IPC handler: Get viewer count
+        ipcMain.handle('session-sharing:get-viewer-count', async (_event, sessionId: string) => {
+            return this.sessionSharingServer.getViewerCount(sessionId)
+        })
+
+        // IPC handler: Check whether a shared session is registered
+        ipcMain.handle('session-sharing:is-registered', async (_event, sessionId: string) => {
+            return this.sessionSharingServer.isSessionRegistered(sessionId)
+        })
+
+        // IPC handler: Get server status
+        ipcMain.handle('session-sharing:get-server-status', async () => {
+            return {
+                isRunning: this.sessionSharingServer.isStarted(),
+                port: this.sessionSharingServer.getPort(),
+                host: this.sessionSharingServer.getHost(),
+                url: this.sessionSharingServer.getWebSocketUrl(false),
+                publicUrl: this.sessionSharingServer.getPublicUrl(),
+                activeSessions: this.sessionSharingServer.getActiveSessionCount(),
+            }
+        })
+
+        // IPC handler: Check if server is running
+        ipcMain.handle('session-sharing:is-server-running', async () => {
+            return this.sessionSharingServer.isStarted()
+        })
+
+        // IPC handler: Start server
+        ipcMain.handle('session-sharing:start-server', async (_event, port?: number, host?: string) => {
+            try {
+                const sessionSharingConfig = this.configStore.sessionSharing ?? {}
+                const bindHost = host ?? sessionSharingConfig.bindHost ?? '0.0.0.0'
+                const bindPort = port ?? sessionSharingConfig.port ?? 0
+                const actualPort = await this.sessionSharingServer.start(bindPort, bindHost)
+                // Broadcast status change
+                this.broadcast('session-sharing:server-status-changed', {
+                    isRunning: true,
+                    port: actualPort,
+                    host: bindHost,
+                    url: this.sessionSharingServer.getWebSocketUrl(false),
+                    publicUrl: this.sessionSharingServer.getPublicUrl(),
+                })
+                return { success: true, port: actualPort, host: bindHost }
+            } catch (error: any) {
+                console.error('Failed to start session sharing server:', error)
+                return { success: false, error: error.message }
+            }
+        })
+
+        // IPC handler: Stop server
+        ipcMain.handle('session-sharing:stop-server', async () => {
+            try {
+                await this.sessionSharingServer.stop()
+                // Broadcast status change
+                this.broadcast('session-sharing:server-status-changed', {
+                    isRunning: false,
+                    port: 0,
+                    host: '0.0.0.0',
+                    url: null,
+                    publicUrl: null,
+                })
+                return { success: true }
+            } catch (error: any) {
+                console.error('Failed to stop session sharing server:', error)
+                return { success: false, error: error.message }
+            }
+        })
+
+        // IPC handler: Set public URL (for tunneling services)
+        ipcMain.handle('session-sharing:set-public-url', async (_event, url: string | null) => {
+            this.sessionSharingServer.setPublicUrl(url)
+            // Broadcast status change
+            this.broadcast('session-sharing:server-status-changed', {
+                isRunning: this.sessionSharingServer.isStarted(),
+                port: this.sessionSharingServer.getPort(),
+                host: this.sessionSharingServer.getHost(),
+                url: this.sessionSharingServer.getWebSocketUrl(false),
+                publicUrl: this.sessionSharingServer.getPublicUrl(),
+            })
+        })
+
+        // IPC handler: Get network URL template
+        ipcMain.handle('session-sharing:get-network-url', async () => {
+            return this.sessionSharingServer.getNetworkUrl()
+        })
+
+        // IPC handler: Get public URL if available
+        ipcMain.handle('session-sharing:get-public-url', async () => {
+            return this.sessionSharingServer.getPublicUrl()
+        })
+
+        // Listen for viewer join/leave events from server
+        process.on('session-sharing:viewer-joined' as any, (sessionId: string, count: number) => {
+            this.broadcast('session-sharing:viewer-count-changed', sessionId, count)
+        })
+
+        process.on('session-sharing:viewer-left' as any, (sessionId: string, count: number) => {
+            this.broadcast('session-sharing:viewer-count-changed', sessionId, count)
+        })
+
+        // Listen for input events from server (will need to route to terminal)
+        process.on('session-sharing:input' as any, (sessionId: string, data: Buffer) => {
+            this.broadcast('session-sharing:terminal-input', sessionId, data)
+        })
+
+    }
+
+    /**
+     * Start tunneling service for internet access (optional)
+     * This can be integrated with services like ngrok, localtunnel, or Cloudflare Tunnel
+     */
+    private async startTunnelingService (): Promise<void> {
+        // TODO: Implement tunneling service integration
+        // Options:
+        // 1. ngrok - requires ngrok binary or API key
+        // 2. localtunnel - npm package, simple to use
+        // 3. Cloudflare Tunnel - free, requires cloudflare account
+        // 4. Custom tunnel service
+
+        console.log('Tunneling service requested but not yet implemented')
+        console.log('For internet access, consider:')
+        console.log('  1. Using port forwarding on your router')
+        console.log('  2. Using a tunneling service (ngrok, localtunnel, etc.)')
+        console.log('  3. Using a VPN to connect to your local network')
+
+        // For now, users can manually set up port forwarding or use external tunneling tools
+    }
+
+    /**
+     * Validate that a file path is within the allowed backup directory
+     */
+    private validateBackupPath (filePath: string): void {
+        const configDir = process.env.TLINK_CONFIG_DIRECTORY ?? app.getPath('userData')
+        const backupDir = path.join(configDir, 'backups')
+        const resolved = path.resolve(filePath)
+        if (!resolved.startsWith(backupDir + path.sep) && resolved !== backupDir) {
+            throw new Error('Path is outside the allowed backup directory')
+        }
+    }
+
+    /**
+     * Initialize backup IPC handlers
+     */
+    private initBackup (): void {
+        // IPC handler: Get backup directory path
+        ipcMain.handle('backup:get-directory-path', async () => {
+            try {
+                const configDir = process.env.TLINK_CONFIG_DIRECTORY ?? app.getPath('userData')
+                return path.join(configDir, 'backups')
+            } catch (error) {
+                console.error('Failed to get backup directory path:', error)
+                return path.join(app.getPath('userData'), 'backups')
+            }
+        })
+
+        // IPC handler: Ensure backup directory exists
+        ipcMain.handle('backup:ensure-directory', async (_event, dir: string) => {
+            try {
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true })
+                    console.log(`Backup directory created: ${dir}`)
+                }
+                return true
+            } catch (error) {
+                console.error('Failed to create backup directory:', error)
+                return false
+            }
+        })
+
+        // IPC handler: Save backup file
+        ipcMain.handle('backup:save-file', async (_event, filePath: string, content: string) => {
+            try {
+                this.validateBackupPath(filePath)
+                const dir = path.dirname(filePath)
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true })
+                }
+                await writeFile(filePath, content, { encoding: 'utf8' })
+                return true
+            } catch (error) {
+                console.error('Failed to save backup file:', error)
+                throw error
+            }
+        })
+
+        // IPC handler: Load backup file
+        ipcMain.handle('backup:load-file', async (_event, filePath: string) => {
+            try {
+                this.validateBackupPath(filePath)
+                if (!fs.existsSync(filePath)) {
+                    throw new Error('Backup file not found')
+                }
+                return fs.readFileSync(filePath, 'utf8')
+            } catch (error) {
+                console.error('Failed to load backup file:', error)
+                throw error
+            }
+        })
+
+        // IPC handler: Delete backup file
+        ipcMain.handle('backup:delete-file', async (_event, filePath: string) => {
+            try {
+                this.validateBackupPath(filePath)
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath)
+                }
+                return true
+            } catch (error) {
+                console.error('Failed to delete backup file:', error)
+                throw error
+            }
+        })
+
+        // IPC handler: Load backup index
+        ipcMain.handle('backup:load-index', async (_event, backupDir: string) => {
+            try {
+                const indexPath = path.join(backupDir, 'index.json')
+                if (fs.existsSync(indexPath)) {
+                    const content = fs.readFileSync(indexPath, 'utf8')
+                    return JSON.parse(content)
+                }
+                return []
+            } catch (error) {
+                console.error('Failed to load backup index:', error)
+                return []
+            }
+        })
+
+        // IPC handler: Save backup index
+        ipcMain.handle('backup:save-index', async (_event, backupDir: string, backups: any[]) => {
+            try {
+                const indexPath = path.join(backupDir, 'index.json')
+                const dir = path.dirname(indexPath)
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir, { recursive: true })
+                }
+                await writeFile(indexPath, JSON.stringify(backups, null, 2), { encoding: 'utf8' })
+                return true
+            } catch (error) {
+                console.error('Failed to save backup index:', error)
+                throw error
+            }
+        })
+
+        // IPC handler: Show save dialog
+        ipcMain.handle('backup:show-save-dialog', async (_event, options: any) => {
+            try {
+                const { dialog } = require('electron')
+                const result = await dialog.showSaveDialog(options)
+                return result
+            } catch (error) {
+                console.error('Failed to show save dialog:', error)
+                throw error
+            }
+        })
+
+        // IPC handler: Show open dialog
+        ipcMain.handle('backup:show-open-dialog', async (_event, options: any) => {
+            try {
+                const { dialog } = require('electron')
+                const result = await dialog.showOpenDialog(options)
+                return result
+            } catch (error) {
+                console.error('Failed to show open dialog:', error)
+                throw error
+            }
+        })
+    }
+
+    async init (): Promise<void> {
+        // Don't auto-start the server - let user control it via the dock button
+        // Server will start when:
+        // 1. User clicks the dock button to start it
+        // 2. User tries to share a session and agrees to start it
+
+        // Check if auto-start is enabled in config (for backward compatibility)
+        const sessionSharingConfig = this.configStore.sessionSharing ?? {}
+        if (sessionSharingConfig.autoStart) {
+            try {
+                const bindHost = sessionSharingConfig.bindHost ?? '0.0.0.0'
+                const port = sessionSharingConfig.port ?? 0
+                await this.sessionSharingServer.start(port, bindHost)
+
+                // If tunneling is enabled, start tunnel service (for internet access)
+                if (sessionSharingConfig.enableTunneling) {
+                    await this.startTunnelingService()
+                }
+            } catch (error) {
+                console.warn('Failed to auto-start session sharing server:', error)
+            }
+        }
+
+        screen.on('display-metrics-changed', () => this.broadcast('host:display-metrics-changed'))
+        screen.on('display-added', () => this.broadcast('host:displays-changed'))
+        screen.on('display-removed', () => this.broadcast('host:displays-changed'))
+    }
+
+    async newWindow (options?: WindowOptions): Promise<Window> {
+        const window = new Window(this, this.configStore, options)
+        this.windows.push(window)
+        if (this.windows.length === 1) {
+            window.makeMain()
+        }
+        window.visible$.subscribe(visible => {
+            if (visible) {
+                this.disableTray()
+            } else {
+                this.enableTray()
+            }
+        })
+        window.closed$.subscribe(() => {
+            this.windows = this.windows.filter(x => x !== window)
+            if (this.aiAssistantWindow === window) {
+                this.aiAssistantWindow = null
+            }
+            if (this.codeEditorWindow === window) {
+                this.codeEditorWindow = null
+            }
+            if (!this.windows.some(x => x.isMainWindow)) {
+                this.windows[0]?.makeMain()
+                this.windows[0]?.present()
+            }
+        })
+        if (process.platform === 'darwin') {
+            this.setupMenu()
+        }
+        await window.ready
+        return window
+    }
+
+    async openAIAssistantWindow (): Promise<void> {
+        // Check if AI assistant window already exists and is not destroyed
+        if (this.aiAssistantWindow && !this.aiAssistantWindow.isDestroyed()) {
+            // Focus existing window
+            this.aiAssistantWindow.present()
+            this.aiAssistantWindow.focus()
+            // Send message to open AI assistant in full-window mode
+            this.aiAssistantWindow.send('host:open-ai-assistant', true)
+            return
+        }
+
+        // Create new window for AI assistant with specific size (800x700)
+        const window = await this.newWindow({
+            width: 800,
+            height: 700,
+            windowRole: 'ai-assistant',
+        })
+        this.aiAssistantWindow = window
+
+        // Set window title
+        window.webContents.once('did-finish-load', () => {
+            window.webContents.executeJavaScript(`
+                if (document.title) {
+                    document.title = 'AI Assistant - ${app.getName()}';
+                }
+            `)
+        })
+
+        // Wait for window to be ready, then send message to open AI assistant in full-window mode
+        window.ready.then(() => {
+            // Send flag indicating this is an AI Assistant window (full-window mode)
+            window.send('host:open-ai-assistant', true)
+        })
+    }
+
+    async openCodeEditorWindow (): Promise<Window> {
+        if (this.codeEditorWindow && !this.codeEditorWindow.isDestroyed()) {
+            this.codeEditorWindow.present()
+            this.codeEditorWindow.focus()
+            this.codeEditorWindow.send('host:open-code-editor', true)
+            return this.codeEditorWindow
+        }
+
+        const window = await this.newWindow({
+            width: 1200,
+            height: 800,
+            windowRole: 'code-editor',
+        })
+        this.codeEditorWindow = window
+        window.ready.then(() => {
+            window.send('host:open-code-editor', true)
+        })
+        return window
+    }
+
+    onGlobalHotkey (): void {
+        let isPresent = this.windows.some(x => x.isFocused() && x.isVisible())
+        const isDockedOnTop = this.windows.some(x => x.isDockedOnTop())
+        if (isDockedOnTop) {
+            // if docked and on top, hide even if not focused right now
+            isPresent = this.windows.some(x => x.isVisible())
+        }
+
+        if (isPresent) {
+            for (const window of this.windows) {
+                window.hide()
+            }
+        } else {
+            for (const window of this.windows) {
+                window.present()
+            }
+        }
+    }
+
+    presentAllWindows (): void {
+        for (const window of this.windows) {
+            window.present()
+        }
+    }
+
+    broadcast (event: string, ...args: any[]): void {
+        for (const window of this.windows) {
+            window.send(event, ...args)
+        }
+    }
+
+    broadcastExcept (event: string, except: WebContents, ...args: any[]): void {
+        for (const window of this.windows) {
+            if (window.webContents.id !== except.id) {
+                window.send(event, ...args)
+            }
+        }
+    }
+
+    async send (event: string, ...args: any[]): Promise<void> {
+        if (!this.hasWindows()) {
+            if (this.studioOnlyApp) {
+                await this.openCodeEditorWindow()
+            } else {
+                await this.newWindow()
+            }
+        }
+        const target = this.windows.find(window => !window.isDestroyed())
+        if (target) {
+            target.send(event, ...args)
+        }
+    }
+
+    enableTray (): void {
+        if (!!this.tray || process.platform === 'linux' || (this.configStore.hideTray ?? false) === true) {
+            return
+        }
+
+        const customTrayPath = path.join(app.getAppPath(), '..', 'build', 'icons', 'Tlink-logo.png')
+        const customTrayIcon = nativeImage.createFromPath(customTrayPath)
+        const hasCustomTrayIcon = !customTrayIcon.isEmpty()
+
+        if (process.platform === 'darwin') {
+            if (hasCustomTrayIcon) {
+                this.tray = new Tray(customTrayIcon)
+            } else {
+                this.tray = new Tray(`${app.getAppPath()}/assets/tray-darwinTemplate.png`)
+                this.tray.setPressedImage(`${app.getAppPath()}/assets/tray-darwinHighlightTemplate.png`)
+            }
+        } else {
+            this.tray = new Tray(hasCustomTrayIcon ? customTrayIcon : `${app.getAppPath()}/assets/tray.png`)
+        }
+
+        this.tray.on('click', () => setTimeout(() => this.focus()))
+
+        const contextMenu = Menu.buildFromTemplate([{
+            label: 'Show',
+            click: () => this.focus(),
+        }])
+
+        if (process.platform !== 'darwin') {
+            this.tray.setContextMenu(contextMenu)
+        }
+
+        this.tray.setToolTip(`${app.getName()} ${app.getVersion()}`)
+    }
+
+    disableTray (): void {
+        if (process.platform === 'linux') {
+            return
+        }
+        this.tray?.destroy()
+        this.tray = null
+    }
+
+    hasWindows (): boolean {
+        return !!this.windows.length
+    }
+
+    focus (): void {
+        for (const window of this.windows) {
+            window.present()
+        }
+    }
+
+    async handleSecondInstance (argv: string[], cwd: string): Promise<void> {
+        if (!this.windows.length) {
+            if (this.studioOnlyApp) {
+                await this.openCodeEditorWindow()
+            } else {
+                await this.newWindow()
+            }
+        }
+        this.presentAllWindows()
+        const target = this.windows.find(w => !w.isDestroyed())
+        target?.passCliArguments(argv, cwd, true)
+    }
+
+    private useBuiltinGraphics (): void {
+        if (process.platform === 'win32') {
+            const keyPath = 'SOFTWARE\\Microsoft\\DirectX\\UserGpuPreferences'
+            const valueName = app.getPath('exe')
+            if (!wnr.getRegistryValue(wnr.HK.CU, keyPath, valueName)) {
+                wnr.setRegistryValue(wnr.HK.CU, keyPath, valueName, wnr.REG.SZ, 'GpuPreference=1;')
+            }
+        }
+    }
+
+    private setupMenu () {
+        const buttonBarEnabled = Boolean(this.configStore?.terminal?.buttonBar?.enabled)
+        const template: MenuItemConstructorOptions[] = [
+            {
+                label: 'Application',
+                submenu: [
+                    { role: 'about', label: `About ${app.getName()}` },
+                    { type: 'separator' },
+                    {
+                        label: 'Preferences',
+                        accelerator: 'Cmd+,',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            this.windows[0].send('host:preferences-menu')
+                        },
+                    },
+                    { type: 'separator' },
+                    {
+                        label: 'Save Workspace',
+                        accelerator: 'CmdOrCtrl+Shift+S',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:workspace-save')
+                        },
+                    },
+                    {
+                        label: 'Load Workspace',
+                        accelerator: 'CmdOrCtrl+Shift+O',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:workspace-load')
+                        },
+                    },
+                    {
+                        label: 'Export Workspace',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:workspace-export')
+                        },
+                    },
+                    {
+                        label: 'Import Workspace',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:workspace-import')
+                        },
+                    },
+                    { type: 'separator' },
+                    { role: 'services', submenu: [] },
+                    { type: 'separator' },
+                    { role: 'hide' },
+                    { role: 'hideOthers' },
+                    { role: 'unhide' },
+                    { type: 'separator' },
+                    {
+                        label: 'Quit',
+                        accelerator: 'Cmd+Q',
+                        click: () => {
+                            this.quitRequested = true
+                            app.quit()
+                        },
+                    },
+                ],
+            },
+            {
+                label: 'Edit',
+                submenu: [
+                    { role: 'undo' },
+                    { role: 'redo' },
+                    { type: 'separator' },
+                    { role: 'cut' },
+                    { role: 'copy' },
+                    { role: 'paste' },
+                    { role: 'pasteAndMatchStyle' },
+                    { role: 'delete' },
+                    { role: 'selectAll' },
+                    { type: 'separator' },
+                    {
+                        label: 'Set session log file',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:set-session-log-file')
+                        },
+                    },
+                ],
+            },
+            {
+                label: 'View',
+                submenu: [
+                    {
+                        label: 'Command Window',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:command-window')
+                        },
+                    },
+                    {
+                        label: 'Command Window (Bottom)',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:command-window-bottom')
+                        },
+                    },
+                    {
+                        label: buttonBarEnabled ? 'Hide button bar' : 'Button Bar',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            if (!this.configStore.terminal) {
+                                this.configStore.terminal = {}
+                            }
+                            if (!this.configStore.terminal.buttonBar) {
+                                this.configStore.terminal.buttonBar = {}
+                            }
+                            this.configStore.terminal.buttonBar.enabled = !this.configStore.terminal.buttonBar.enabled
+                            if (process.platform === 'darwin') {
+                                this.setupMenu()
+                            }
+                            target.send('host:button-bar')
+                        },
+                    },
+                    {
+                        label: 'Session Manager',
+                        click: async () => {
+                            if (!this.hasWindows()) {
+                                await this.newWindow()
+                            }
+                            const target = this.windows.find(window => window.isFocused()) ?? this.windows[0]
+                            target.send('host:session-manager')
+                        },
+                    },
+                    { type: 'separator' },
+                    { role: 'toggleDevTools' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' },
+                ],
+            },
+            {
+                role: 'window',
+                submenu: [
+                    { role: 'minimize' },
+                    { role: 'zoom' },
+                    { type: 'separator' },
+                    { role: 'front' },
+                ],
+            },
+            {
+                role: 'help',
+                submenu: [
+                    {
+                        label: 'Website',
+                        click () {
+                            shell.openExternal('https://eugeny.github.io/tlink')
+                        },
+                    },
+                ],
+            },
+        ]
+
+        if (process.env.TLINK_DEV) {
+            template[2].submenu['unshift']({ role: 'reload' })
+        }
+
+        Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+    }
+
+    private updateConfigStoreFromSerialized (config: string): void {
+        try {
+            const parsed = yaml.load(config)
+            if (parsed && typeof parsed === 'object') {
+                this.configStore = parsed
+            }
+        } catch {
+            // Ignore parse errors and keep the current in-memory config snapshot.
+        }
+    }
+}

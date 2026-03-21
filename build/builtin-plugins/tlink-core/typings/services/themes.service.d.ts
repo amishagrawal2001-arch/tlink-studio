@@ -1,0 +1,24 @@
+import { Observable } from 'rxjs';
+import { Theme } from '../api/theme';
+export declare class ThemesService {
+    private config;
+    private standardTheme;
+    private platform;
+    private themes;
+    get themeChanged$(): Observable<Theme>;
+    private themeChanged;
+    private styleElement;
+    private rootElementStyleBackup;
+    /** @hidden */
+    private constructor();
+    private getConfigStoreOrDefaults;
+    private getTerminalThemeSettings;
+    private applyThemeVariables;
+    private ensureContrast;
+    private increaseContrast;
+    findTheme(name: string): Theme | null;
+    findCurrentTheme(): Theme;
+    _getActiveColorScheme(): any;
+    applyTheme(theme: Theme): void;
+    private applyCurrentTheme;
+}

@@ -1,0 +1,563 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
+log() { printf "[tlink-studio] %s\n" "$*"; }
+
+SKIP_SYSTEM_DEPS="${TLINK_SKIP_SYSTEM_DEPS:-0}"
+SKIP_INSTALL="${TLINK_SKIP_INSTALL:-0}"
+SKIP_BUILD="${TLINK_SKIP_BUILD:-0}"
+SKIP_START="${TLINK_SKIP_START:-0}"
+REBUILD_NATIVE="${TLINK_REBUILD_NATIVE:-0}"
+CLEAN_USER_PLUGINS="${TLINK_CLEAN_USER_PLUGINS:-0}"
+UPGRADE_NODE="${TLINK_UPGRADE_NODE:-1}"
+MIN_NODE_VERSION="${TLINK_NODE_MIN_VERSION:-22.12.0}"
+INSTALL_OLLAMA="${TLINK_INSTALL_OLLAMA:-1}"
+INSTALL_TABBY="${TLINK_INSTALL_TABBY:-0}"
+TABBY_INSTALL_METHOD="${TLINK_TABBY_INSTALL_METHOD:-brew}"
+TABBY_DOCKER_IMAGE="${TLINK_TABBY_DOCKER_IMAGE:-registry.tabbyml.com/tabbyml/tabby}"
+TABBY_DOCKER_CONTAINER="${TLINK_TABBY_DOCKER_CONTAINER:-tabby}"
+TABBY_PORT="${TLINK_TABBY_PORT:-8080}"
+TABBY_DATA_DIR="${TLINK_TABBY_DATA_DIR:-$HOME/.tabby}"
+TABBY_MODEL="${TLINK_TABBY_MODEL:-StarCoder-1B}"
+TABBY_CHAT_MODEL="${TLINK_TABBY_CHAT_MODEL:-Qwen2-1.5B-Instruct}"
+TABBY_DEVICE="${TLINK_TABBY_DEVICE:-cuda}"
+TABBY_DOCKER_GPU="${TLINK_TABBY_DOCKER_GPU:-1}"
+TABBY_DOCKER_SELINUX="${TLINK_TABBY_DOCKER_SELINUX:-0}"
+APP_BUNDLE_PATH="${TLINK_APP_BUNDLE_PATH:-/Applications/Tlink Studio.app}"
+APP_POSTINSTALL="${TLINK_APP_POSTINSTALL:-1}"
+REFRESH_LAUNCHPAD="${TLINK_REFRESH_LAUNCHPAD:-0}"
+ONLY_INSTALL_OPTIONAL=0
+EXPLICIT_INSTALL_OLLAMA=0
+EXPLICIT_INSTALL_TABBY=0
+EXPLICIT_APP_POSTINSTALL=0
+SKIP_NODE_CHECK=0
+SKIP_YARN_CHECK=0
+
+if [[ $# -gt 0 ]]; then
+  ONLY_INSTALL_OPTIONAL=1
+  for arg in "$@"; do
+    case "$arg" in
+      --install-ollama|--install-tabby|--install-tabby-docker|--no-install-ollama|--no-install-tabby|--tabby-install-method=*|--register-app|--refresh-launchpad|--no-app-postinstall|--app-bundle-path=*) ;;
+      --help|-h) ;;
+      *) ONLY_INSTALL_OPTIONAL=0 ;;
+    esac
+  done
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-system-deps) SKIP_SYSTEM_DEPS=1 ;;
+    --skip-install) SKIP_INSTALL=1 ;;
+    --skip-build) SKIP_BUILD=1 ;;
+    --skip-start) SKIP_START=1 ;;
+    --rebuild-native) REBUILD_NATIVE=1 ;;
+    --clean-user-plugins) CLEAN_USER_PLUGINS=1 ;;
+    --upgrade-node) UPGRADE_NODE=1 ;;
+    --no-upgrade-node) UPGRADE_NODE=0 ;;
+    --install-ollama) INSTALL_OLLAMA=1; EXPLICIT_INSTALL_OLLAMA=1 ;;
+    --no-install-ollama) INSTALL_OLLAMA=0 ;;
+    --install-tabby) INSTALL_TABBY=1; EXPLICIT_INSTALL_TABBY=1 ;;
+    --install-tabby-docker) INSTALL_TABBY=1; EXPLICIT_INSTALL_TABBY=1; TABBY_INSTALL_METHOD="docker" ;;
+    --no-install-tabby) INSTALL_TABBY=0 ;;
+    --tabby-install-method=*) TABBY_INSTALL_METHOD="${1#*=}" ;;
+    --register-app) APP_POSTINSTALL=1; EXPLICIT_APP_POSTINSTALL=1 ;;
+    --refresh-launchpad) APP_POSTINSTALL=1; REFRESH_LAUNCHPAD=1; EXPLICIT_APP_POSTINSTALL=1 ;;
+    --no-app-postinstall) APP_POSTINSTALL=0 ;;
+    --app-bundle-path=*) APP_BUNDLE_PATH="${1#*=}" ;;
+    --install-only) SKIP_BUILD=1; SKIP_START=1 ;;
+    --build-only) SKIP_INSTALL=1; SKIP_START=1 ;;
+    --help|-h)
+      cat <<'EOF'
+Usage: ./install_tlink.sh [options]
+
+Options:
+  --skip-system-deps  Skip OS-level dependencies
+  --skip-install      Skip yarn install
+  --skip-build        Skip yarn build
+  --skip-start        Skip yarn start
+  --rebuild-native    Rebuild native modules (keytar, node-pty, etc.)
+  --clean-user-plugins  Move user plugin cache out of the way
+  --upgrade-node      Attempt to upgrade Node if below minimum
+  --no-upgrade-node   Do not attempt to upgrade Node
+  --install-ollama    Attempt to install Ollama (optional; if used alone, only installs Ollama)
+  --no-install-ollama Skip Ollama installation
+  --install-tabby     Attempt to install Tabby using --tabby-install-method (default: brew)
+  --install-tabby-docker Attempt to launch Tabby in Docker using official defaults
+  --no-install-tabby  Skip Tabby installation
+  --tabby-install-method=<brew|docker> Choose Tabby install method for --install-tabby
+  --register-app      Re-register installed /Applications/Tlink Studio.app with macOS LaunchServices
+  --refresh-launchpad Re-register app and restart Dock so Launchpad index refreshes
+  --no-app-postinstall Skip macOS app registration helper
+  --app-bundle-path=<path> App bundle path for --register-app (default: /Applications/Tlink Studio.app)
+  --install-only      Only install dependencies
+  --build-only        Only run build
+EOF
+      exit 0
+      ;;
+    *)
+      log "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ "$ONLY_INSTALL_OPTIONAL" -eq 1 && "$EXPLICIT_INSTALL_OLLAMA" -eq 0 && "$EXPLICIT_INSTALL_TABBY" -eq 0 && "$EXPLICIT_APP_POSTINSTALL" -eq 0 ]]; then
+  ONLY_INSTALL_OPTIONAL=0
+fi
+
+OS_NAME="$(uname -s)"
+case "$OS_NAME" in
+  Darwin) OS="macos" ;;
+  Linux) OS="linux" ;;
+  MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
+  *) OS="unknown" ;;
+esac
+
+log "Detected OS: $OS_NAME ($OS)"
+
+if [[ "$ONLY_INSTALL_OPTIONAL" -eq 1 ]]; then
+  SKIP_SYSTEM_DEPS=1
+  SKIP_INSTALL=1
+  SKIP_BUILD=1
+  SKIP_START=1
+  UPGRADE_NODE=0
+  SKIP_NODE_CHECK=1
+  SKIP_YARN_CHECK=1
+
+  if [[ "$EXPLICIT_INSTALL_OLLAMA" -eq 1 || "$EXPLICIT_INSTALL_TABBY" -eq 1 || "$EXPLICIT_APP_POSTINSTALL" -eq 1 ]]; then
+    if [[ "$EXPLICIT_INSTALL_OLLAMA" -eq 0 ]]; then
+      INSTALL_OLLAMA=0
+    fi
+    if [[ "$EXPLICIT_INSTALL_TABBY" -eq 0 ]]; then
+      INSTALL_TABBY=0
+    fi
+    if [[ "$EXPLICIT_APP_POSTINSTALL" -eq 0 ]]; then
+      APP_POSTINSTALL=0
+    fi
+  fi
+fi
+
+version_ge() {
+  # returns 0 if $1 >= $2
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$2" ]]
+}
+
+try_upgrade_node() {
+  local target="$1"
+
+  if command -v fnm >/dev/null 2>&1; then
+    log "Upgrading Node via fnm..."
+    fnm install "$target"
+    eval "$(fnm env --use-on-cd)"
+    fnm use "$target"
+    return 0
+  fi
+
+  if [[ -z "${NVM_DIR:-}" ]]; then
+    export NVM_DIR="$HOME/.nvm"
+  fi
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+  fi
+  if command -v nvm >/dev/null 2>&1; then
+    log "Upgrading Node via nvm..."
+    nvm install "$target"
+    nvm use "$target"
+    return 0
+  fi
+
+  if command -v volta >/dev/null 2>&1; then
+    log "Upgrading Node via volta..."
+    volta install "node@$target"
+    return 0
+  fi
+
+  if command -v asdf >/dev/null 2>&1; then
+    log "Upgrading Node via asdf..."
+    if ! asdf plugin list | grep -q nodejs; then
+      log "asdf nodejs plugin missing. Install with: asdf plugin add nodejs"
+      return 1
+    fi
+    asdf install nodejs "$target"
+    asdf global nodejs "$target"
+    return 0
+  fi
+
+  if command -v brew >/dev/null 2>&1; then
+    log "Homebrew detected. Please run:"
+    log "  brew install node@22 && brew link --force --overwrite node@22"
+    return 1
+  fi
+
+  return 1
+}
+
+install_ollama() {
+  if command -v ollama >/dev/null 2>&1; then
+    log "Ollama already installed."
+    return 0
+  fi
+
+  case "$OS" in
+    macos)
+      if command -v brew >/dev/null 2>&1; then
+        log "Installing Ollama via Homebrew..."
+        brew install ollama
+        return $?
+      fi
+      if ! command -v curl >/dev/null 2>&1; then
+        log "curl not found. Install Ollama manually from https://ollama.com/download."
+        return 1
+      fi
+      if ! command -v hdiutil >/dev/null 2>&1; then
+        log "hdiutil not found. Install Ollama manually from https://ollama.com/download."
+        return 1
+      fi
+      log "Installing Ollama via DMG (no Homebrew)..."
+      local tmp_dir dmg mount_point
+      tmp_dir="$(mktemp -d)"
+      dmg="$tmp_dir/Ollama.dmg"
+      mount_point="$tmp_dir/OllamaMount"
+      mkdir -p "$mount_point"
+
+      cleanup_ollama_dmg() {
+        # Use globals to avoid set -u errors after locals go out of scope.
+        if [[ -n "${OLLAMA_MOUNT_POINT:-}" ]]; then
+          hdiutil detach "$OLLAMA_MOUNT_POINT" >/dev/null 2>&1 || true
+        fi
+        if [[ -n "${OLLAMA_TMP_DIR:-}" ]]; then
+          rm -rf "$OLLAMA_TMP_DIR" || true
+        fi
+      }
+      OLLAMA_TMP_DIR="$tmp_dir"
+      OLLAMA_MOUNT_POINT="$mount_point"
+      trap cleanup_ollama_dmg EXIT
+
+      curl -fsSL "https://ollama.com/download/Ollama.dmg" -o "$dmg"
+      hdiutil attach "$dmg" -nobrowse -mountpoint "$mount_point"
+
+      if [[ -d "/Applications/Ollama.app" ]]; then
+        log "Ollama.app already exists in /Applications. Skipping copy."
+        if [[ ! -x "/usr/local/bin/ollama" ]]; then
+          log "Creating /usr/local/bin/ollama symlink (may require sudo)..."
+          if command -v sudo >/dev/null 2>&1; then
+            sudo ln -sf /Applications/Ollama.app/Contents/MacOS/Ollama /usr/local/bin/ollama
+          else
+            ln -sf /Applications/Ollama.app/Contents/MacOS/Ollama /usr/local/bin/ollama
+          fi
+        fi
+        if command -v open >/dev/null 2>&1; then
+          log "Starting Ollama..."
+          open -a Ollama >/dev/null 2>&1 || true
+        fi
+        return 0
+      fi
+
+      if cp -R "$mount_point/Ollama.app" /Applications/; then
+        log "Ollama installed to /Applications."
+        if [[ ! -x "/usr/local/bin/ollama" ]]; then
+          log "Creating /usr/local/bin/ollama symlink (may require sudo)..."
+          if command -v sudo >/dev/null 2>&1; then
+            sudo ln -sf /Applications/Ollama.app/Contents/MacOS/Ollama /usr/local/bin/ollama
+          else
+            ln -sf /Applications/Ollama.app/Contents/MacOS/Ollama /usr/local/bin/ollama
+          fi
+        fi
+        if command -v open >/dev/null 2>&1; then
+          log "Starting Ollama..."
+          open -a Ollama >/dev/null 2>&1 || true
+        fi
+        return 0
+      fi
+      if command -v sudo >/dev/null 2>&1; then
+        log "Retrying copy with sudo..."
+        sudo cp -R "$mount_point/Ollama.app" /Applications/
+        log "Ollama installed to /Applications."
+        return 0
+      fi
+      log "Failed to copy Ollama.app to /Applications. Please install manually."
+      return 1
+      ;;
+    linux)
+      if command -v curl >/dev/null 2>&1; then
+        log "Installing Ollama via install script (requires sudo)..."
+        curl -fsSL https://ollama.com/install.sh | sh
+        return $?
+      fi
+      log "curl not found. Please install Ollama from https://ollama.com/download."
+      return 1
+      ;;
+    windows)
+      log "Windows detected. Please install Ollama from https://ollama.com/download."
+      return 1
+      ;;
+    *)
+      log "Unknown OS. Please install Ollama manually from https://ollama.com/download."
+      return 1
+      ;;
+  esac
+}
+
+install_tabby() {
+  if ! command -v brew >/dev/null 2>&1; then
+    log "Homebrew not found. Install Homebrew and run: brew install tabbyml/tabby/tabby"
+    return 1
+  fi
+
+  if ! brew tap tabbyml/tabby >/dev/null 2>&1; then
+    log "Warning: could not add tabbyml/tabby tap (continuing)."
+  fi
+
+  if command -v tabby >/dev/null 2>&1; then
+    log "Tabby already installed."
+  else
+    log "Installing Tabby via Homebrew..."
+    if ! brew install tabbyml/tabby/tabby; then
+      log "Tabby install failed."
+      return 1
+    fi
+    log "Tabby installed."
+  fi
+
+  log "Attempting to start Tabby service..."
+  if ! brew services start tabby >/dev/null 2>&1; then
+    log "Could not start brew service \"tabby\" automatically."
+    log "You can run Tabby manually: tabby serve --model ${TABBY_MODEL} --chat-model ${TABBY_CHAT_MODEL} --device ${TABBY_DEVICE}"
+  fi
+
+  log "Tabby endpoint: http://localhost:${TABBY_PORT}"
+  return 0
+}
+
+install_tabby_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Docker not found. Install Docker and re-run with --install-tabby-docker."
+    return 1
+  fi
+
+  mkdir -p "$TABBY_DATA_DIR"
+
+  local mount_spec="${TABBY_DATA_DIR}:/data"
+  if [[ "$TABBY_DOCKER_SELINUX" == "1" ]]; then
+    mount_spec="${mount_spec}:Z"
+  fi
+
+  if docker ps -a --format '{{.Names}}' | grep -Fxq "$TABBY_DOCKER_CONTAINER"; then
+    if docker ps --format '{{.Names}}' | grep -Fxq "$TABBY_DOCKER_CONTAINER"; then
+      log "Tabby Docker container \"$TABBY_DOCKER_CONTAINER\" is already running."
+    else
+      log "Starting existing Tabby Docker container \"$TABBY_DOCKER_CONTAINER\"..."
+      docker start "$TABBY_DOCKER_CONTAINER" >/dev/null
+    fi
+    log "Tabby should be available at http://localhost:${TABBY_PORT}"
+    return 0
+  fi
+
+  local docker_args=(
+    run -d
+    --name "$TABBY_DOCKER_CONTAINER"
+    -p "${TABBY_PORT}:8080"
+    -v "$mount_spec"
+  )
+
+  if [[ "$TABBY_DOCKER_GPU" == "1" ]]; then
+    docker_args+=(--gpus all)
+  fi
+
+  docker_args+=(
+    "$TABBY_DOCKER_IMAGE"
+    serve
+    --model "$TABBY_MODEL"
+    --chat-model "$TABBY_CHAT_MODEL"
+    --device "$TABBY_DEVICE"
+  )
+
+  log "Launching Tabby in Docker..."
+  if ! docker "${docker_args[@]}"; then
+    log "Tabby Docker launch failed."
+    log "Try TLINK_TABBY_DOCKER_GPU=0 for CPU-only Docker environments."
+    return 1
+  fi
+
+  log "Tabby container started. Endpoint: http://localhost:${TABBY_PORT}"
+  log "View logs with: docker logs -f ${TABBY_DOCKER_CONTAINER}"
+  return 0
+}
+
+resolve_user_plugins_dir() {
+  case "$OS" in
+    macos)
+      echo "$HOME/Library/Application Support/Tlink Studio/plugins"
+      ;;
+    linux)
+      echo "${XDG_CONFIG_HOME:-$HOME/.config}/tlink-studio/plugins"
+      ;;
+    windows)
+      if command -v cygpath >/dev/null 2>&1 && [[ -n "${APPDATA:-}" ]]; then
+        echo "$(cygpath -u "$APPDATA")/tlink-studio/plugins"
+      else
+        echo "$HOME/AppData/Roaming/tlink-studio/plugins"
+      fi
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+register_macos_app() {
+  if [[ "$OS" != "macos" ]]; then
+    return 0
+  fi
+
+  if [[ "$APP_POSTINSTALL" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ ! -d "$APP_BUNDLE_PATH" ]]; then
+    if [[ "$EXPLICIT_APP_POSTINSTALL" -eq 1 || "$REFRESH_LAUNCHPAD" == "1" ]]; then
+      log "App registration skipped: bundle not found at $APP_BUNDLE_PATH"
+    fi
+    return 0
+  fi
+
+  local lsregister_bin
+  lsregister_bin="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [[ -x "$lsregister_bin" ]]; then
+    log "Registering app bundle with LaunchServices..."
+    "$lsregister_bin" -f "$APP_BUNDLE_PATH" >/dev/null 2>&1 || log "Warning: LaunchServices registration failed."
+  else
+    log "Warning: LaunchServices tool not found: $lsregister_bin"
+  fi
+
+  if [[ "$APP_BUNDLE_PATH" == /Applications/* ]]; then
+    touch /Applications >/dev/null 2>&1 || true
+  fi
+
+  if [[ "$REFRESH_LAUNCHPAD" == "1" ]]; then
+    log "Refreshing Launchpad index (Dock restart)..."
+    defaults write com.apple.dock ResetLaunchPad -bool true >/dev/null 2>&1 || true
+    killall Dock >/dev/null 2>&1 || true
+  fi
+}
+
+if [[ "$SKIP_NODE_CHECK" -ne 1 ]] && ! command -v node >/dev/null 2>&1; then
+  if [[ "$UPGRADE_NODE" -eq 1 ]]; then
+    log "Node.js not found. Attempting install (>= $MIN_NODE_VERSION)..."
+    if ! try_upgrade_node "$MIN_NODE_VERSION"; then
+      log "Node.js >= $MIN_NODE_VERSION is required. Please install and re-run."
+      exit 1
+    fi
+  else
+    log "Node.js is required (>= $MIN_NODE_VERSION). Please install and re-run."
+    exit 1
+  fi
+fi
+
+if [[ "$SKIP_NODE_CHECK" -ne 1 ]]; then
+  NODE_VERSION="$(node -v | sed -E 's/^v//')"
+  if ! version_ge "$NODE_VERSION" "$MIN_NODE_VERSION"; then
+    if [[ "$UPGRADE_NODE" -eq 1 ]]; then
+      log "Node.js >= $MIN_NODE_VERSION is required. Current: v$NODE_VERSION"
+      log "Attempting upgrade..."
+      if try_upgrade_node "$MIN_NODE_VERSION"; then
+        NODE_VERSION="$(node -v | sed -E 's/^v//')"
+        if ! version_ge "$NODE_VERSION" "$MIN_NODE_VERSION"; then
+          log "Upgrade completed but Node version is still v$NODE_VERSION"
+          exit 1
+        fi
+      else
+        log "Automatic upgrade failed. Please upgrade Node to >= $MIN_NODE_VERSION."
+        exit 1
+      fi
+    else
+      log "Node.js >= $MIN_NODE_VERSION is required. Current: v$NODE_VERSION"
+      exit 1
+    fi
+  fi
+fi
+
+if [[ "$SKIP_YARN_CHECK" -ne 1 ]] && ! command -v yarn >/dev/null 2>&1; then
+  if command -v corepack >/dev/null 2>&1; then
+    log "Yarn not found. Enabling Yarn Classic via corepack..."
+    corepack prepare yarn@1.22.22 --activate
+  else
+    log "Yarn Classic (1.x) is required. Install with: npm i -g yarn@1.22.22"
+    exit 1
+  fi
+fi
+
+if [[ "$OS" == "linux" && "$SKIP_SYSTEM_DEPS" -ne 1 ]]; then
+  if command -v apt-get >/dev/null 2>&1; then
+    log "Installing Linux system dependencies (requires sudo)..."
+    sudo apt-get update
+    sudo apt-get install -y \
+      libfontconfig-dev libsecret-1-dev libarchive-tools libnss3 \
+      libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 \
+      libgbm1 cmake
+  else
+    log "System deps install skipped (apt-get not found)."
+  fi
+fi
+
+if [[ "$OS" == "windows" ]]; then
+  log "Windows detected. This script expects Git Bash or WSL."
+fi
+
+if [[ "$INSTALL_OLLAMA" -eq 1 ]]; then
+  install_ollama || true
+fi
+
+if [[ "$INSTALL_TABBY" -eq 1 ]]; then
+  case "$TABBY_INSTALL_METHOD" in
+    brew)
+      install_tabby || true
+      ;;
+    docker)
+      install_tabby_docker || true
+      ;;
+    *)
+      log "Unknown Tabby install method: $TABBY_INSTALL_METHOD (expected brew or docker)"
+      ;;
+  esac
+fi
+
+if [[ "$CLEAN_USER_PLUGINS" -eq 1 ]]; then
+  USER_PLUGINS_DIR="$(resolve_user_plugins_dir)"
+  if [[ -n "$USER_PLUGINS_DIR" && -d "$USER_PLUGINS_DIR" ]]; then
+    BACKUP_DIR="${USER_PLUGINS_DIR}.bak-$(date +%Y%m%d%H%M%S)"
+    log "Moving user plugins cache to: $BACKUP_DIR"
+    mv "$USER_PLUGINS_DIR" "$BACKUP_DIR"
+  else
+    log "No user plugins cache found to move."
+  fi
+fi
+
+if [[ "$SKIP_INSTALL" -ne 1 ]]; then
+  log "Installing dependencies with yarn..."
+  yarn install
+fi
+
+if [[ "$SKIP_BUILD" -ne 1 ]]; then
+  log "Building project..."
+  yarn run build
+fi
+
+if [[ "$REBUILD_NATIVE" -eq 1 ]]; then
+  log "Rebuilding native modules..."
+  node scripts/build-native.mjs
+fi
+
+register_macos_app
+
+if [[ "$SKIP_START" -ne 1 ]]; then
+  log "Starting app..."
+  yarn start
+else
+  log "Start skipped."
+fi

@@ -1,0 +1,52 @@
+.modal-header
+    h5.modal-title(translate) Session log file
+    button.btn-close(type='button', aria-label='Close', (click)='cancel()')
+
+.modal-body
+    .form-check.mb-3
+        input.form-check-input(
+            type='checkbox',
+            [(ngModel)]='enabled'
+        )
+        label.form-check-label(translate) Enable session logging
+
+    .mb-3
+        label.form-label(translate) Log directory
+        .input-group
+            input.form-control(
+                type='text',
+                placeholder='session-logs',
+                [(ngModel)]='directory',
+                [disabled]='!enabled'
+            )
+            button.btn.btn-outline-secondary(
+                type='button',
+                (click)='browseDirectory()',
+                [disabled]='!canPickDirectory || !enabled',
+                translate
+            ) Browse
+        .form-text.text-muted(translate) Leave empty to use the default session-logs folder
+
+    .mb-3
+        label.form-label(translate) Log filename template
+        input.form-control(
+            type='text',
+            placeholder='{profile}-{timestamp}.log',
+            [(ngModel)]='filenameTemplate',
+            [disabled]='!enabled'
+        )
+        .form-text.text-muted
+            span(translate) Tokens:
+            span.ms-1 &#123;profile&#125;, &#123;host&#125;, &#123;user&#125;, &#123;date&#125;, &#123;time&#125;, &#123;timestamp&#125;
+
+    .form-check
+        input.form-check-input(
+            type='checkbox',
+            [(ngModel)]='append',
+            [disabled]='!enabled'
+        )
+        label.form-check-label(translate) Append to existing file
+
+.modal-footer
+    button.btn.btn-secondary((click)='cancel()', translate) Cancel
+    button.btn.btn-primary((click)='ok()', translate) OK

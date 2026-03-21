@@ -1,0 +1,74 @@
+version: 2
+updates:
+- package-ecosystem: npm
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/app"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-core"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-settings"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-terminal"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-local"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-community-color-schemes"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-electron"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-web"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-plugin-manager"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: npm
+  directory: "/tlink-ssh"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "04:00"
+  open-pull-requests-limit: 20

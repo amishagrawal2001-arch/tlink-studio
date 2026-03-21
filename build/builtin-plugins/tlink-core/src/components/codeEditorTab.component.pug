@@ -1,0 +1,398 @@
+.code-editor-body
+    .code-editor-toolbar
+        .toolbar-left
+            .menu-container.left-menu((mouseenter)='openFileMenuOnHover()', (mouseleave)='closeFileMenuOnLeave()')
+                button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFileMenu($event)', title='File actions') File
+                .dropdown-menu(*ngIf='fileMenuOpen', (mouseenter)='keepFileMenuOpenOnHover()', (mouseleave)='closeFileMenuOnLeave()', (click)='$event.stopPropagation()')
+                    button(type='button', (click)='handleFileAction("new")') New
+                    button(type='button', (click)='handleFileAction("newTopology")') New topology…
+                    button(type='button', (click)='handleFileAction("newFolder")') New folder...
+                    button(type='button', (click)='handleFileAction("open")') Open
+                    button(type='button', (click)='handleFileAction("openLocal")') Open local
+                    button(type='button', (click)='handleFileAction("openPath")') Open path...
+                    button(type='button', (click)='handleFileAction("save")') Save
+                    button(type='button', (click)='handleFileAction("saveAll")') Save all
+                    button(type='button', (click)='handleFileAction("saveAs")') Save as
+                    button(type='button', (click)='handleFileAction("duplicate")', [disabled]='!canDuplicateOnDisk') Duplicate
+                    button(type='button', (click)='handleFileAction("move")', [disabled]='!canMoveOnDisk') Move…
+                    button(type='button', (click)='handleFileAction("delete")', [disabled]='!canDeleteOnDisk') Delete (disk)
+                    button(type='button', (click)='handleFileAction("reopen")') Reopen closed
+            .menu-container.left-menu((mouseenter)='openEditMenuOnHover()', (mouseleave)='closeEditMenuOnLeave()')
+                button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEditMenu($event)', title='Edit actions') ✎ Edit
+                .dropdown-menu(*ngIf='editMenuOpen', (mouseenter)='keepEditMenuOpenOnHover()', (mouseleave)='closeEditMenuOnLeave()', (click)='$event.stopPropagation()')
+                    button(type='button', (click)='handleEditAction("quickOpen")') Quick open
+                    button(type='button', (click)='handleEditAction("undo")') Undo
+                    button(type='button', (click)='handleEditAction("redo")') Redo
+                    button(type='button', (click)='handleEditAction("find")') Find
+                    button(type='button', (click)='handleEditAction("replace")') Replace
+                    button(type='button', (click)='handleEditAction("goto")') Go to line
+                    button(type='button', (click)='handleEditAction("format")') Format
+                    button(type='button', (click)='handleEditAction("formatJson")') Format JSON
+                    button(type='button', (click)='handleEditAction("uppercase")') Uppercase selection
+                    button(type='button', (click)='handleEditAction("lowercase")') Lowercase selection
+                    button(type='button', (click)='handleEditAction("titleCase")') Title case selection
+                    button(type='button', (click)='handleEditAction("trimTrailing")') Trim trailing spaces
+                    button(type='button', (click)='handleEditAction("cut")') Cut
+                    button(type='button', (click)='handleEditAction("copy")') Copy
+                    button(type='button', (click)='handleEditAction("paste")') Paste
+                    button(type='button', (click)='handleEditAction("selectAll")') Select all
+                    button(type='button', (click)='handleEditAction("send")') Send to terminal
+                    button(type='button', (click)='handleEditAction("run")') Run in terminal
+                    button(type='button', (click)='handleEditAction("openClipboard")') Open clipboard
+                    button(type='button', (click)='handleEditAction("wrap")') {{wordWrapEnabled ? 'Wrap off' : 'Wrap on'}}
+                    button(type='button', (click)='handleEditAction("minimap")') {{minimapEnabled ? 'Hide minimap' : 'Show minimap'}}
+            select.form-select.form-select-sm((change)='handleRecentSelection($event)')
+                option(value='') Recent files
+                option(*ngFor='let item of recentFiles', [value]='item') {{item}}
+            select.form-select.form-select-sm((change)='selectDiffTarget($event.target.value)')
+                option(value='') Diff with…
+                option(*ngFor='let item of diffCandidates', [value]='item.id') {{getDiffOptionLabel(item)}}
+            button.btn.btn-sm.btn-outline-secondary(type='button', (click)='diffWithSelected()', [disabled]='!pendingDiffDocId') Diff
+            button.btn.btn-sm.btn-outline-secondary(type='button', (click)='compareWithDisk()', [disabled]='!documents.length') Diff vs disk
+            button.btn.btn-sm.btn-outline-secondary(type='button', (click)='exitDiffMode()', [disabled]='viewMode!=="diff"') Exit diff
+        .toolbar-right
+            label.font-control.theme-mode-control
+                span.small-label Theme
+                select.form-select.form-select-sm.theme-mode-select((change)='setThemeMode($event.target.value)', [value]='themeMode')
+                    option(value='auto') Auto
+                    option(value='light') Light
+                    option(value='dark') Dark
+                    option(value='hc') High contrast
+                    option(value='solarized-light') Solarized light
+                    option(value='solarized-dark') Solarized dark
+                    option(value='dracula') Dracula
+                    option(value='monokai') Monokai
+                    option(value='nord') Nord
+            label.font-control.theme-preset-control
+                span.small-label Palette
+                select.form-select.form-select-sm.theme-preset-select((change)='onEditorThemePresetChange($event.target.value)', [value]='editorThemePresetValue')
+                    option(value='custom') Custom
+                    option(*ngFor='let preset of editorThemePresets', [value]='preset.color') {{preset.name}}
+            .menu-container
+                button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics') Diagnostics
+                .dropdown-menu.diagnostics-panel(*ngIf='showDiagnostics', (click)='$event.stopPropagation()')
+                    .diagnostics-row(*ngFor='let item of diagnosticsItems')
+                        span.label {{item.label}}
+                        code.value {{item.value}}
+            button.btn.btn-sm.btn-outline-secondary(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.active]='topologyCanvasMode', [disabled]='viewMode==="diff"') {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
+            button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleSplitView()', [class.active]='!!splitEditor', [disabled]='viewMode==="diff"') Split
+            button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleAutosave()', [class.active]='autosaveEnabled') Autosave
+            button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleIndentationStyle()', [class.active]='getActiveDoc()?.insertSpaces') {{getActiveDoc()?.insertSpaces ? 'Spaces' : 'Tabs'}}
+            label.font-control
+                span.small-label Tab
+                input.form-control.form-control-sm(type='number', [value]='getActiveDoc()?.tabSize || 4', min='1', max='12', (change)='setTabSize($event.target.valueAsNumber)')
+            button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEOL()') {{statusEOL || 'EOL'}}
+            label.font-control
+                span.small-label Font
+                input.form-control.form-control-sm(type='number', [value]='fontSize', min='10', max='28', (change)='setFontSize($event.target.valueAsNumber)')
+            label.font-control
+                span.small-label Line
+                input.form-control.form-control-sm(type='number', [value]='lineHeight', min='14', max='40', (change)='setLineHeight($event.target.valueAsNumber)')
+    .editor-shell
+        .tab-sidebar([style.width.px]='sidebarWidth')
+            .sidebar-header
+                .folder-actions
+                    button.btn.btn-link.btn-sm(type='button', ngbTooltip='Add folder', (click)='addFolder()')
+                        i.fa.fa-folder-plus
+                    button.btn.btn-link.btn-sm(type='button', ngbTooltip='New file', (click)='newFile()')
+                        i.fa.fa-file
+                    button.btn.btn-link.btn-sm(type='button', ngbTooltip='New topology', (click)='handleFileAction("newTopology")')
+                        i.fa.fa-sitemap
+                    button.btn.btn-link.btn-sm(type='button', ngbTooltip='Delete selected (disk)', (click)='handleFileAction("delete")', [disabled]='!canDeleteOnDisk')
+                        i.fa.fa-trash
+                    button.btn.btn-link.btn-sm(type='button', ngbTooltip='Open existing folder', (click)='openFolderFromDisk()')
+                        i.fa.fa-folder-open
+            .tree-list(#treeList, (scroll)='onTreeListScroll()')
+                .tree-virtual-spacer(*ngIf='treeTopSpacerPx > 0', [style.height.px]='treeTopSpacerPx')
+                .tree-row(*ngFor='let item of visibleTreeItems; trackBy: trackTreeItem', [style.paddingLeft.px]='item.depth*12', [style.--tree-depth]='item.depth', [class.folder]='item.node.isFolder', [class.root-node]='item.node.isFolder && item.depth===0', [class.active-folder]='item.node.isFolder && item.node.path===selectedFolderPath && selectedFilePathKeys.size===0', [class.active-doc]='item.node.docId===activeDocId', [class.selected-file]='!item.node.isFolder && isTreeFileSelected(item.node.path)', [class.selected-folder]='item.node.isFolder && isTreeFolderSelected(item.node.path)', (click)='onTreeClick($event, item.node)', (dblclick)='onTreeDblClick($event, item.node)', (contextmenu)='onTreeContextMenu($event, item.node)', [draggable]='!!item.node.path', (dragstart)='item.node.path && onTreeDragStart($event, item.node)', (dragend)='item.node.path && onTreeDragEnd()', (dragover)='item.node.isFolder && onTreeDragOver($event)', (drop)='item.node.isFolder && onTreeDrop($event, item.node.path)')
+                    span.chevron(*ngIf='item.node.isFolder && item.node.path && item.node.path !== ""', (click)='toggleFolder($event, item.node)') {{expandedFolders.has(item.node.path) ? "▾" : "▸"}}
+                    span.bullet(*ngIf='!item.node.isFolder', [class.untitled]='item.node.docId ? !(getDocById(item.node.docId)?.path) : false', [class.titled]='item.node.docId ? !!(getDocById(item.node.docId)?.path) : true') •
+                    span.name(*ngIf='!item.node.docId || editingDocId!==item.node.docId') {{item.node.name}}
+                    input.form-control.form-control-sm.rename-input(*ngIf='item.node.docId && editingDocId===item.node.docId', [id]='"code-editor-rename-"+item.node.docId', type='text', [value]='editingDocName', (click)='$event.stopPropagation()', (input)='editingDocName=$event.target.value', (keydown.enter)='commitInlineRename(item.node.docId!)', (keydown.esc)='cancelInlineRename()', (blur)='commitInlineRename(item.node.docId!)')
+                    span.dirty-indicator(*ngIf='item.node.docId && getDocById(item.node.docId)?.isDirty') •
+                    button.btn.btn-link.btn-sm(*ngIf='isTreeNodeClosable(item.node)', type='button', (click)='closeTreeNode(item.node); $event.stopPropagation()', [title]='getTreeCloseTitle(item.node)') ×
+                .tree-virtual-spacer(*ngIf='treeBottomSpacerPx > 0', [style.height.px]='treeBottomSpacerPx')
+            .dropdown-menu.doc-context-menu(*ngIf='folderContextMenuOpen', [style.left.px]='folderContextMenuX', [style.top.px]='folderContextMenuY', (click)='$event.stopPropagation()')
+                button(type='button', (click)='handleFolderContextAction("newFile")') New file…
+                button(type='button', (click)='handleFolderContextAction("newTopology")') New topology…
+                button(type='button', (click)='handleFolderContextAction("newFolder")') New folder…
+                button(type='button', (click)='handleFolderContextAction("rename")', [disabled]='isFolderContextProtectedRoot') Rename…
+                button(type='button', (click)='handleFolderContextAction("open")') Show in Finder/Explorer
+                button(*ngIf='canRemoveFolderFromList', type='button', (click)='handleFolderContextAction("remove")') Remove from list
+                button(type='button', (click)='handleFolderContextAction("scopeToggle")', [disabled]='!folderContextScopeRoot') {{folderScopeToggleLabel}}
+                button(type='button', (click)='handleFolderContextAction("duplicate")') {{selectionContextDuplicateLabel}}
+                button(type='button', (click)='handleFolderContextAction("move")') {{selectionContextMoveLabel}}
+                button(type='button', (click)='handleFolderContextAction("delete")', [disabled]='!canDeleteFolderContextSelection') {{selectionContextDeleteLabel}}
+            .dropdown-menu.doc-context-menu(*ngIf='fileContextMenuOpen', [style.left.px]='fileContextMenuX', [style.top.px]='fileContextMenuY', (click)='$event.stopPropagation()')
+                button(type='button', (click)='handleFileContextAction("open")') Open
+                button(type='button', (click)='handleFileContextAction("rename")') Rename…
+                button(type='button', (click)='handleFileContextAction("show")') Show in Finder/Explorer
+                button(type='button', (click)='handleFileContextAction("duplicate")') {{selectionContextDuplicateLabel}}
+                button(type='button', (click)='handleFileContextAction("move")') {{selectionContextMoveLabel}}
+                button(type='button', (click)='handleFileContextAction("delete")') {{selectionContextDeleteLabel}}
+            .dropdown-menu.doc-context-menu(*ngIf='docContextMenuOpen', [style.left.px]='docContextMenuX', [style.top.px]='docContextMenuY', (click)='$event.stopPropagation()')
+                button(type='button', (click)='renameDocumentFromContextMenu()') Rename…
+                button(type='button', (click)='moveDocumentFromContextMenu(null)') Move to All documents
+                button(*ngFor='let folder of folders', type='button', (click)='moveDocumentFromContextMenu(folder.path)') Move to {{folder.name}}
+                button(type='button', (click)='closeDocumentFromContextMenu()') Close
+        .sidebar-resizer((mousedown)='beginSidebarResize($event)')
+        .editor-main(dropZone, (transfer)='onExternalTransfer($event)')
+            .external-conflict-banner(*ngIf='activeExternalConflictDoc as conflictDoc')
+                span.banner-text External changes detected for {{conflictDoc.name}}. Choose how to continue.
+                .banner-actions
+                    button.btn.btn-sm.btn-outline-secondary(type='button', (click)='reloadActiveDocFromConflict()') Reload disk
+                    button.btn.btn-sm.btn-outline-secondary(type='button', (click)='keepActiveDocLocalChanges()') Keep mine
+                    button.btn.btn-sm.btn-outline-secondary(type='button', (click)='compareActiveDocWithConflictDisk()') Compare
+            .split-controls(*ngIf='splitEditor && viewMode==="editor"')
+                span Split view document:
+                select((change)='selectSplitDoc($event.target.value)')
+                    option(value='') Primary
+                    option(*ngFor='let doc of documents', [value]='doc.id', [selected]='doc.id===splitDocId') {{doc.name}}
+                button.btn.btn-sm.btn-outline-secondary.btn-icon(type='button', ngbTooltip='Close split', (click)='toggleSplitView()') ×
+            .topology-canvas-shell(*ngIf='topologyCanvasMode')
+                .topology-toolbar
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Add router', aria-label='Add router', (click)='addTopologyNode("router")')
+                        span.topology-device-icon.topology-device-icon-router(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                circle(cx='8', cy='8', r='4.6')
+                                path(d='M3.2 8h9.6')
+                                path(d='M8 3.2v9.6')
+                                path(d='M11.2 5.8l1.6 2.2-1.6 2.2')
+                                path(d='M4.8 10.2l-1.6-2.2 1.6-2.2')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Add switch', aria-label='Add switch', (click)='addTopologyNode("switch")')
+                        span.topology-device-icon.topology-device-icon-switch(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                rect(x='2.2', y='3.2', width='11.6', height='9.6', rx='1.6')
+                                path(d='M5 7h6')
+                                path(d='M5 9h6')
+                                circle(cx='4', cy='7', r='0.5', fill='currentColor', stroke='none')
+                                circle(cx='12', cy='9', r='0.5', fill='currentColor', stroke='none')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Add host', aria-label='Add host', (click)='addTopologyNode("host")')
+                        i.fa.fa-desktop
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Add circle', aria-label='Add circle', (click)='addTopologyShape("circle")')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                circle(cx='8', cy='8', r='5.2')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Add oval', aria-label='Add oval', (click)='addTopologyShape("oval")')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                ellipse(cx='8', cy='8', rx='6', ry='4.2')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyFreeLinkPlacementDirected===true', [ngbTooltip]='topologyFreeLinkPlacementDirected===true ? "Cancel free arrow mode" : "Free arrow mode"', [attr.aria-label]='topologyFreeLinkPlacementDirected===true ? "Cancel free arrow mode" : "Free arrow mode"', (click)='toggleTopologyFreeLinkMode(true)')
+                        i.fa.fa-long-arrow-right
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyFreeLinkPlacementDirected===false', [ngbTooltip]='topologyFreeLinkPlacementDirected===false ? "Cancel free line mode" : "Free line mode"', [attr.aria-label]='topologyFreeLinkPlacementDirected===false ? "Cancel free line mode" : "Free line mode"', (click)='toggleTopologyFreeLinkMode(false)')
+                        i.fa.fa-minus
+                    span.topology-sep(aria-hidden='true')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyTextPlacementMode', [ngbTooltip]='topologyTextPlacementMode ? "Cancel text mode" : "Place text"', [attr.aria-label]='topologyTextPlacementMode ? "Cancel text mode" : "Place text"', (click)='toggleTopologyTextPlacementMode()')
+                        i.fa.fa-font
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyStickyNotePlacementMode', [ngbTooltip]='topologyStickyNotePlacementMode ? "Cancel sticky note mode" : "Place sticky note"', [attr.aria-label]='topologyStickyNotePlacementMode ? "Cancel sticky note mode" : "Place sticky note"', (click)='toggleTopologyStickyNotePlacementMode()')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                path(d='M3.2 2.2h9.6v9.6l-3 2H3.2z')
+                                path(d='M9.8 11.8v-2h2')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='!!topologyPendingLinkSourceId', [ngbTooltip]='topologyPendingLinkSourceId ? "Cancel node link mode" : "Link nodes"', [attr.aria-label]='topologyPendingLinkSourceId ? "Cancel node link mode" : "Link nodes"', (click)='toggleTopologyLinkMode()')
+                        i.fa.fa-link
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyCurvedLinks', [ngbTooltip]='topologyCurvedLinks ? "Curved links mode" : "Straight links mode"', [attr.aria-label]='topologyCurvedLinks ? "Curved links mode" : "Straight links mode"', (click)='toggleTopologyCurvedLinksMode()')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(*ngIf='topologyCurvedLinks', viewBox='0 0 16 16')
+                                path(d='M2 11.5Q8 2.8 14 11.5')
+                                circle(cx='2', cy='11.5', r='1', fill='currentColor', stroke='none')
+                                circle(cx='14', cy='11.5', r='1', fill='currentColor', stroke='none')
+                            svg(*ngIf='!topologyCurvedLinks', viewBox='0 0 16 16')
+                                path(d='M2 8h12')
+                                circle(cx='2', cy='8', r='1', fill='currentColor', stroke='none')
+                                circle(cx='14', cy='8', r='1', fill='currentColor', stroke='none')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', [class.active]='topologyLinkStyleToggleState!=="line"', [ngbTooltip]='topologyLinkStyleToggleTooltip', [attr.aria-label]='topologyLinkStyleToggleTooltip', (click)='toggleTopologyNewLinksDirectionMode()')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(*ngIf='topologyLinkStyleToggleState==="arrow"', viewBox='0 0 16 16')
+                                path(d='M2 8h9.2')
+                                path(d='M9.4 5.7 14 8l-4.6 2.3')
+                            svg(*ngIf='topologyLinkStyleToggleState==="line"', viewBox='0 0 16 16')
+                                path(d='M2 8h12')
+                            svg(*ngIf='topologyLinkStyleToggleState==="double"', viewBox='0 0 16 16')
+                                path(d='M2.4 8h11.2')
+                                path(d='M4.7 5.7 2 8l2.7 2.3')
+                                path(d='M11.3 5.7 14 8l-2.7 2.3')
+                    span.topology-sep(aria-hidden='true')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Duplicate selected nodes', aria-label='Duplicate selected nodes', (click)='duplicateSelectedTopologyNodes()', [disabled]='selectedTopologyNodeCount===0')
+                        span.topology-device-icon(aria-hidden='true')
+                            svg(viewBox='0 0 16 16')
+                                rect(x='3.2', y='3.2', width='8.4', height='8.4', rx='1.3')
+                                rect(x='5.3', y='5.3', width='8.4', height='8.4', rx='1.3')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Delete selected', aria-label='Delete selected', (click)='removeSelectedTopologyItem()', [disabled]='!canDeleteSelectedTopology')
+                        i.fa.fa-trash
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Undo', aria-label='Undo', (click)='runTopologyUndo()', [disabled]='!canUndoTopology')
+                        i.fa.fa-undo
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Redo', aria-label='Redo', (click)='runTopologyRedo()', [disabled]='!canRedoTopology')
+                        i.fa.fa-repeat
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Restore snapshot', aria-label='Restore snapshot', (click)='restorePreviousTopologySnapshot()', [disabled]='!canRestoreTopologySnapshot')
+                        i.fa.fa-history
+                    span.topology-sep(aria-hidden='true')
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Zoom out', aria-label='Zoom out', (click)='zoomTopologyOut()')
+                        i.fa.fa-search-minus
+                    span.topology-zoom-indicator {{topologyZoomLabel}}
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Zoom in', aria-label='Zoom in', (click)='zoomTopologyIn()')
+                        i.fa.fa-search-plus
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Fit to canvas', aria-label='Fit to canvas', (click)='fitTopologyToCanvas()')
+                        i.fa.fa-arrows-alt
+                    button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Reset view', aria-label='Reset view', (click)='resetTopologyViewport()')
+                        i.fa.fa-crosshairs
+                    span.topology-hint Cmd/Ctrl/Shift-click to multi-select
+                    span.topology-hint Drag empty canvas to select, scroll wheel to pan
+                    span.topology-hint Right-click empty canvas for sticky note options
+                    span.topology-hint Cmd/Ctrl+C/V duplicate selected nodes
+                    span.topology-hint(*ngIf='topologyTextPlacementMode') Click canvas to place text
+                    span.topology-hint(*ngIf='topologyStickyNotePlacementMode') Click canvas to place sticky note
+                    span.topology-hint(*ngIf='topologyPendingLinkSourceId==="__pending__"') Select source item
+                    span.topology-hint(*ngIf='topologyPendingLinkSourceId && topologyPendingLinkSourceId!=="__pending__"') Select destination item
+                    span.topology-hint(*ngIf='topologyFreeLinkPlacementDirected!==null && !topologyFreeLinkCreating') Drag on canvas to draw free link
+                    span.topology-hint(*ngIf='topologyFreeLinkPlacementDirected!==null && topologyFreeLinkCreating') Release mouse to place free link
+                .dropdown-menu.doc-context-menu.topology-context-menu(*ngIf='topologyContextMenuOpen', [style.left.px]='topologyContextMenuX', [style.top.px]='topologyContextMenuY', (click)='$event.stopPropagation()')
+                    button(type='button', (click)='addStickyNoteFromTopologyContextMenu()')
+                        i.fa.fa-sticky-note(style='margin-right: 6px;')
+                        | Add sticky note
+                .topology-error(*ngIf='topologyParseError') {{topologyParseError}}
+                .topology-workspace(*ngIf='!topologyParseError', [class.inspector-visible]='hasTopologySelection')
+                    .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)', (wheel)='onTopologyCanvasWheel($event)')
+                        .topology-viewport([style.transform]='topologyCanvasTransform')
+                            svg.topology-links
+                                defs
+                                    marker#topologyArrowhead(markerWidth='8', markerHeight='8', refX='7', refY='4', orient='auto-start-reverse')
+                                        path(d='M 0 0 L 8 4 L 0 8 z', fill='context-stroke')
+                                path.topology-link.topology-link-preview(*ngIf='topologyFreeLinkPreviewPath', [attr.d]='topologyFreeLinkPreviewPath', [attr.marker-end]='topologyFreeLinkPlacementDirected ? "url(#topologyArrowhead)" : null')
+                                g(*ngFor='let item of topologyLinkRenderItems; trackBy: trackTopologyLinkRender')
+                                    path.topology-link-hit([class.selected]='isTopologyLinkSelected(item.id)', [class.free-link]='item.isFree', [attr.d]='item.path', (mousedown)='startTopologyFreeLinkDrag($event, item.id)', (click)='onTopologyLinkClick($event, item.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id)')
+                                    path.topology-link([class.selected]='isTopologyLinkSelected(item.id)', [class.free-link]='item.isFree', [class.undirected]='!item.directed && !item.bidirectional', [style.--topology-link-color]='item.color || null', [attr.d]='item.path', [attr.marker-start]='item.bidirectional ? "url(#topologyArrowhead)" : null', [attr.marker-end]='item.directed ? "url(#topologyArrowhead)" : null')
+                                    circle.topology-link-end-hit(*ngIf='!item.isFree', [attr.cx]='item.startX', [attr.cy]='item.startY', r='10', (mousedown)='startTopologyFreeLinkDrag($event, item.id)', (click)='onTopologyLinkClick($event, item.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id)')
+                                    circle.topology-link-end-hit(*ngIf='!item.isFree', [attr.cx]='item.endX', [attr.cy]='item.endY', r='10', (mousedown)='startTopologyFreeLinkDrag($event, item.id)', (click)='onTopologyLinkClick($event, item.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id)')
+                                    ng-container(*ngFor='let label of item.labels; trackBy: trackTopologyLinkRenderLabel')
+                                        text.topology-link-label(*ngIf='label.text', [class.selected]='isTopologyLinkSelected(item.id)', [attr.x]='label.labelX', [attr.y]='label.labelY', (mousedown)='$event.stopPropagation()', (click)='onTopologyLinkClick($event, item.id, label.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id, label.id)') {{label.text}}
+                                    circle.topology-link-handle(*ngIf='item.isFree && isTopologyLinkSelected(item.id)', [attr.cx]='item.startX', [attr.cy]='item.startY', r='6', (mousedown)='startTopologyFreeLinkHandleDrag($event, item.id, "start")')
+                                    circle.topology-link-handle(*ngIf='item.isFree && isTopologyLinkSelected(item.id)', [attr.cx]='item.endX', [attr.cy]='item.endY', r='6', (mousedown)='startTopologyFreeLinkHandleDrag($event, item.id, "end")')
+                            ng-container(*ngFor='let item of topologyLinkRenderItems; trackBy: trackTopologyLinkRender')
+                                ng-container(*ngFor='let label of item.labels; trackBy: trackTopologyLinkRenderLabel')
+                                    .topology-link-inline-editor(*ngIf='isTopologyInlineEditingLink(item.id, label.id)', [style.left.px]='getTopologyInlineEditorXForLink(item, label.id)', [style.top.px]='getTopologyInlineEditorYForLink(item, label.id)', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()')
+                                        input.topology-inline-input.topology-inline-input-link(type='text', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"link"', [attr.data-inline-id]='item.id', [attr.data-inline-label-id]='label.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
+                            .topology-shape(*ngFor='let shape of topologyShapes; trackBy: trackTopologyShape', [class.selected]='isTopologyShapeSelected(shape.id)', [class.resizing]='topologyResizeShapeId===shape.id', [class.dragging]='topologyDragShapeId===shape.id', [class.circle]='shape.kind==="circle"', [class.oval]='shape.kind==="oval"', [style.left.px]='shape.x', [style.top.px]='shape.y', [style.width.px]='shape.width', [style.height.px]='shape.height', [style.--topology-shape-color]='shape.color || null', (mousedown)='startTopologyShapeDrag($event, shape.id)', (click)='onTopologyShapeClick($event, shape.id)', (dblclick)='editTopologyShapeLabelFromDoubleClick($event, shape.id)')
+                                input.topology-inline-input(*ngIf='isTopologyInlineEditingShape(shape.id)', type='text', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"shape"', [attr.data-inline-id]='shape.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
+                                span.topology-shape-label(*ngIf='!isTopologyInlineEditingShape(shape.id) && shape.label') {{shape.label}}
+                                span.topology-item-resize-handle(*ngIf='isTopologyShapeSelected(shape.id)', (mousedown)='startTopologyShapeResize($event, shape.id)', (click)='$event.stopPropagation()')
+                            .topology-text-label(*ngFor='let item of topologyTexts; trackBy: trackTopologyText', [class.selected]='isTopologyTextSelected(item.id)', [class.sticky-note]='item.sticky===true', [class.collapsed]='isTopologyStickyCollapsed(item)', [style.left.px]='item.x', [style.top.px]='item.y', [style.width.px]='getTopologyTextWidth(item)', [style.height.px]='getTopologyTextHeight(item)', [style.--topology-sticky-bg]='getTopologyStickyNoteBackgroundColor(item)', [style.--topology-sticky-fg]='item.sticky ? getTopologyStickyNoteTextColor(item) : null', [style.color]='item.sticky ? null : getTopologyTextDisplayColor(item)', (mousedown)='startTopologyTextDrag($event, item.id)', (click)='onTopologyTextClick($event, item.id)', (dblclick)='editTopologyTextFromDoubleClick($event, item.id)')
+                                span.topology-sticky-collapse-icon(*ngIf='item.sticky', role='button', tabindex='0', [attr.aria-label]='isTopologyStickyCollapsed(item) ? "Expand sticky note" : "Collapse sticky note"', [attr.title]='isTopologyStickyCollapsed(item) ? "Expand note" : "Collapse note"', (mousedown)='$event.stopPropagation()', (click)='toggleTopologyStickyCollapsed($event, item.id)')
+                                    i.fas([ngClass]='isTopologyStickyCollapsed(item) ? "fa-chevron-down" : "fa-chevron-up"')
+                                textarea.topology-inline-input.topology-inline-input-text.topology-inline-input-textarea(*ngIf='item.sticky && isTopologyInlineEditingText(item.id) && !isTopologyStickyCollapsed(item)', rows='4', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"text"', [attr.data-inline-id]='item.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event, true)', (blur)='onTopologyInlineEditBlur()')
+                                input.topology-inline-input.topology-inline-input-text(*ngIf='!item.sticky && isTopologyInlineEditingText(item.id)', type='text', [style.width.px]='getTopologyInlineTextInputWidthPx()', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"text"', [attr.data-inline-id]='item.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
+                                span.topology-sticky-collapsed-title(*ngIf='item.sticky && isTopologyStickyCollapsed(item) && !isTopologyInlineEditingText(item.id)') {{getTopologyStickyCollapsedLabel(item)}}
+                                span(*ngIf='!isTopologyInlineEditingText(item.id) && (!item.sticky || !isTopologyStickyCollapsed(item))') {{item.text || (item.sticky ? 'Note' : 'Text')}}
+                                span.topology-item-resize-handle(*ngIf='item.sticky && isTopologyTextSelected(item.id)', (mousedown)='startTopologyTextResize($event, item.id)', (click)='$event.stopPropagation()')
+                            .topology-node(*ngFor='let node of topologyNodes; trackBy: trackTopologyNode', [class.selected]='isTopologyNodeSelected(node.id)', [class.resizing]='topologyResizeNodeId===node.id', [class.dragging]='topologyDragNodeId===node.id', [class.pending-link-source]='node.id===topologyPendingLinkSourceId', [style.left.px]='node.x', [style.top.px]='node.y', [style.width.px]='getTopologyNodeWidth(node)', [style.height.px]='getTopologyNodeHeight(node)', [style.--topology-node-color]='node.color || null', (mousedown)='startTopologyNodeDrag($event, node.id)', (click)='onTopologyNodeClick($event, node.id)', (dblclick)='editTopologyNodeLabelFromDoubleClick($event, node.id)')
+                                span.topology-node-icon.topology-device-icon.topology-device-icon-router(*ngIf='getTopologyNodeIconKind(node)==="router"', aria-hidden='true')
+                                    svg(viewBox='0 0 16 16')
+                                        circle(cx='8', cy='8', r='4.6')
+                                        path(d='M3.2 8h9.6')
+                                        path(d='M8 3.2v9.6')
+                                        path(d='M11.2 5.8l1.6 2.2-1.6 2.2')
+                                        path(d='M4.8 10.2l-1.6-2.2 1.6-2.2')
+                                span.topology-node-icon.topology-device-icon.topology-device-icon-switch(*ngIf='getTopologyNodeIconKind(node)==="switch"', aria-hidden='true')
+                                    svg(viewBox='0 0 16 16')
+                                        rect(x='2.2', y='3.2', width='11.6', height='9.6', rx='1.6')
+                                        path(d='M5 7h6')
+                                        path(d='M5 9h6')
+                                        circle(cx='4', cy='7', r='0.5', fill='currentColor', stroke='none')
+                                        circle(cx='12', cy='9', r='0.5', fill='currentColor', stroke='none')
+                                span.topology-node-icon.topology-device-icon(*ngIf='getTopologyNodeIconKind(node)==="host"', aria-hidden='true')
+                                    svg(viewBox='0 0 16 16')
+                                        rect(x='2.2', y='2.8', width='11.6', height='8.6', rx='1.4')
+                                        path(d='M6 13.2h4')
+                                        path(d='M8 11.4v1.8')
+                                span.topology-node-icon.topology-device-icon(*ngIf='getTopologyNodeIconKind(node)==="default"', aria-hidden='true')
+                                    svg(viewBox='0 0 16 16')
+                                        circle(cx='8', cy='8', r='3.8')
+                                .node-title(*ngIf='!isTopologyInlineEditingNode(node.id)') {{node.label}}
+                                input.node-title.topology-inline-input(*ngIf='isTopologyInlineEditingNode(node.id)', type='text', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"node"', [attr.data-inline-id]='node.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
+                                .node-meta {{node.type}}
+                                span.topology-item-resize-handle(*ngIf='isTopologyNodeSelected(node.id)', (mousedown)='startTopologyNodeResize($event, node.id)', (click)='$event.stopPropagation()')
+                        .topology-marquee(*ngIf='topologyMarqueeActive', [style.left.px]='topologyMarqueeLeftPx', [style.top.px]='topologyMarqueeTopPx', [style.width.px]='topologyMarqueeWidthPx', [style.height.px]='topologyMarqueeHeightPx')
+                    .topology-inspector(*ngIf='hasTopologySelection')
+                        .inspector-title Inspector
+                        .inspector-section(*ngIf='selectedTopologyNodeCount')
+                            .inspector-subtitle Node color ({{selectedTopologyNodeCount}} selected)
+                            label Color
+                            select.form-select.form-select-sm([value]='selectedTopologyNodesColorValue', (change)='updateSelectedTopologyNodeColor($event.target.value)')
+                                option(*ngIf='selectedTopologyNodeCount > 1 && !selectedTopologyNodesColorValue', value='') Mixed (choose color)
+                                option(*ngFor='let option of topologyNodeColorOptions', [value]='option.value') {{option.label}}
+                        .inspector-section(*ngIf='selectedTopologyNode as node')
+                            label Label
+                            input.form-control.form-control-sm(type='text', [value]='node.label', (input)='updateSelectedTopologyNodeLabel($event.target.value)')
+                            label Type
+                            input.form-control.form-control-sm(type='text', [value]='node.type', (input)='updateSelectedTopologyNodeType($event.target.value)')
+                        .inspector-section(*ngIf='selectedTopologyLinkCount')
+                            .inspector-subtitle Link color ({{selectedTopologyLinkCount}} selected)
+                            label Color
+                            select.form-select.form-select-sm([value]='selectedTopologyLinksColorValue', (change)='updateSelectedTopologyLinkColor($event.target.value)')
+                                option(*ngIf='selectedTopologyLinkCount > 1 && !selectedTopologyLinksColorValue', value='') Mixed (choose color)
+                                option(*ngFor='let option of topologyLinkColorOptions', [value]='option.value') {{option.label}}
+                            label Style
+                            select.form-select.form-select-sm([value]='selectedTopologyLinksDirectionValue', (change)='updateSelectedTopologyLinkDirection($event.target.value)')
+                                option(*ngIf='selectedTopologyLinkCount > 1 && !selectedTopologyLinksDirectionValue', value='') Mixed (choose style)
+                                option(value='arrow') Arrow
+                                option(value='double') Double arrow
+                                option(value='line') Line
+                        .inspector-section(*ngIf='selectedTopologyLink as link')
+                            .inspector-subtitle Link {{link.id}}
+                            label Link label
+                            input.form-control.form-control-sm(type='text', [value]='getTopologyPrimaryLinkLabel(link)?.text || ""', (input)='updateSelectedTopologyLinkLabel($event.target.value)')
+                        .inspector-section(*ngIf='selectedTopologyShapeCount')
+                            .inspector-subtitle Shape color ({{selectedTopologyShapeCount}} selected)
+                            label Color
+                            select.form-select.form-select-sm([value]='selectedTopologyShapesColorValue', (change)='updateSelectedTopologyShapeColor($event.target.value)')
+                                option(*ngIf='selectedTopologyShapeCount > 1 && !selectedTopologyShapesColorValue', value='') Mixed (choose color)
+                                option(*ngFor='let option of topologyShapeColorOptions', [value]='option.value') {{option.label}}
+                        .inspector-section(*ngIf='selectedTopologyShape as shape')
+                            .inspector-subtitle Shape {{shape.id}}
+                            label Label
+                            input.form-control.form-control-sm(type='text', [value]='shape.label || ""', (input)='updateSelectedTopologyShapeLabel($event.target.value)')
+                            label Type
+                            select.form-select.form-select-sm([value]='shape.kind', (change)='updateSelectedTopologyShapeKind($event.target.value)')
+                                option(value='circle') Circle
+                                option(value='oval') Oval
+                            label Width
+                            input.form-control.form-control-sm(type='number', [value]='shape.width', min='20', max='560', (change)='updateSelectedTopologyShapeSize("width", $event.target.valueAsNumber)')
+                            label Height
+                            input.form-control.form-control-sm(type='number', [value]='shape.height', min='20', max='560', [disabled]='shape.kind==="circle"', (change)='updateSelectedTopologyShapeSize("height", $event.target.valueAsNumber)')
+                        .inspector-section(*ngIf='selectedTopologyText as item')
+                            .inspector-subtitle Text {{item.id}}
+                            label(*ngIf='!item.sticky') Value
+                            input.form-control.form-control-sm(*ngIf='!item.sticky', type='text', [value]='item.text', (input)='updateSelectedTopologyTextValue($event.target.value)')
+                            span.topology-inspector-icon-action(*ngIf='item.sticky', role='button', tabindex='0', [attr.aria-label]='item.collapsed ? "Expand sticky note" : "Collapse sticky note"', [attr.title]='item.collapsed ? "Expand note" : "Collapse note"', (click)='toggleSelectedTopologyStickyCollapsed()')
+                                i.fas([ngClass]='item.collapsed ? "fa-chevron-down" : "fa-chevron-up"')
+                            label {{item.sticky ? "Note color" : "Color"}}
+                            select.form-select.form-select-sm([value]='selectedTopologyTextColor', (change)='updateSelectedTopologyTextColor($event.target.value)')
+                                option(*ngFor='let option of topologyTextColorOptions', [value]='option.value') {{option.label}}
+                            label(*ngIf='item.sticky') Width
+                            input.form-control.form-control-sm(*ngIf='item.sticky', type='number', [value]='item.width || 350', min='100', (change)='updateSelectedTopologyTextSize("width", $event.target.valueAsNumber)')
+                            label(*ngIf='item.sticky') Height
+                            input.form-control.form-control-sm(*ngIf='item.sticky', type='number', [value]='item.height || 150', min='64', (change)='updateSelectedTopologyTextSize("height", $event.target.valueAsNumber)')
+            .code-editor-host-container([class.hidden]='topologyCanvasMode', [class.diff-mode]='viewMode==="diff"', [class.split-mode]='!!splitEditor && viewMode==="editor"')
+                .editor-pane.primary([class.hidden]='viewMode!=="editor"')
+                    div.editor-host(#primaryHost)
+                .editor-pane.split([class.hidden]='!splitEditor || viewMode!=="editor"')
+                    div.editor-host(#splitHost)
+                .editor-pane.diff([class.hidden]='viewMode!=="diff"')
+                    div.editor-host(#diffHost)
+    .code-editor-status
+        .status-left
+            span.status-message(*ngIf='statusLabel') {{statusLabel}}
+            span.status-tip(*ngIf='!topologyCanvasMode') Tip: click line numbers to select full lines (Shift+click for range), right-click editor to add sticky note
+        .status-center(*ngIf='breadcrumbs.length') {{breadcrumbs.join(' / ')}}
+        .status-right
+            span {{statusLineCol}}
+            span {{statusLanguage}}
+            span {{statusEOL}}
+            span {{statusIndent}}
+            span {{statusEncoding}}
+            span {{statusWrap}}
+            .status-actions
+                button.btn.btn-sm.btn-outline-secondary.btn-icon(type='button', ngbTooltip='Run in terminal', (click)='runActiveFile()')
+                    i.fa.fa-play
+                button.btn.btn-sm.btn-outline-secondary.btn-icon(type='button', *ngIf='hasRunTerminal', ngbTooltip='Close run terminal', (click)='closeRunTerminal()')
+                    i.fas.fa-times

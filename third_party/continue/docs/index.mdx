@@ -1,0 +1,49 @@
+---
+title: "What is Continue?"
+description: "Run agents as CI checks on every PR"
+---
+
+<video autoPlay muted loop playsInline className="rounded-xl" src="https://continue.dev/videos/demo.mp4" />
+
+Continue lets you create agents that review every pull request. Each agent runs as a GitHub check: green if the code looks good, red with a suggested diff if not.
+
+Agents are markdown prompts describing the standards you want to enforce. They can be defined at [continue.dev](https://continue.dev/agents) or in your repo at `.continue/agents/`.
+
+For example, you could use [this agent](https://www.continue.dev/continuedev/code-security-review) as a starting point, or you could create the following file in your repository:
+
+```markdown .continue/agents/security-review.md
+---
+name: Security Review
+description: Review PR for basic security vulnerabilities
+---
+
+Review this PR and check that:
+
+- No secrets or API keys are hardcoded
+- All new API endpoints have input validation
+- Error responses use the standard error format
+```
+
+## Get started
+
+1. Connect GitHub at [continue.dev](https://continue.dev/)
+2. [Create an agent](https://continue.dev/agents/new)
+3. Open a PR. The agent will show up as a check in GitHub.
+4. If changes are suggested, click the check in GitHub and accept or reject the suggestion to make the check pass.
+
+## Preconfigured Cloud Agents
+
+<CardGroup cols={2}>
+  <Card title="Code Security Review" icon="shield-check" href="https://www.continue.dev/agents/a395928f-1547-409b-bba2-28e968d78c83">
+    Performs a comprehensive security audit for OWASP Top 10 vulnerabilities and security best practices.
+  </Card>
+  <Card title="Improve Test Coverage" icon="vial" href="https://www.continue.dev/agents/5e88b9a4-8815-4f43-9422-60a1a3c502b0">
+    Make incremental improvements to test coverage every day.
+  </Card>
+  <Card title="Update AGENTS.md" icon="robot" href="https://www.continue.dev/agents/79bde57b-ee59-4164-9e3e-dbb0f512a95f">
+    Keep your AGENTS.md continuously synced with your codebase.
+  </Card>
+  <Card title="Draft Changelog Update" icon="file-lines" href="https://www.continue.dev/agents/f58139c5-4f85-4e33-9970-35bbe320c3b6">
+    Create a draft update to CHANGELOG.md based on recent changes in a pull request.
+  </Card>
+</CardGroup>
