@@ -1989,16 +1989,16 @@
 }
 
 .code-editor-status {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
     padding: 3px 8px;
     border-top: 1px solid var(--theme-bg-less);
     background: var(--theme-bg);
     color: var(--theme-fg-less);
     font-size: 11px;
     line-height: 1.1;
-    align-items: center;
 
     .status-left {
         display: flex;
@@ -2006,7 +2006,7 @@
         gap: 8px;
         min-width: 0;
         overflow: hidden;
-        justify-self: start;
+        flex: 1 1 0;
     }
 
     .status-message {
@@ -2028,17 +2028,15 @@
     }
 
     .status-center {
-        justify-self: center;
         color: var(--theme-fg-less);
         text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        flex-shrink: 1;
     }
 
     .status-right {
-        min-width: 0;
-        justify-self: end;
         flex-shrink: 0;
         display: flex;
         align-items: center;
