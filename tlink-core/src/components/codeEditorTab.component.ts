@@ -13841,7 +13841,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const term = await terminalService.openTab(profile, cwd, false)
         if (!term) {
             this.setError('Failed to open terminal tab')
+            return
         }
+        // Place terminal as a split pane below the editor instead of replacing it
+        try {
+            ;(term as any).enableToolbar = true
+            ;(term as any).pinToolbar = true
+            ;(term as any).revealToolbar = true
+        } catch {}
+        await this.placeTerminalNextToEditor(term)
     }
 
     private async placeTerminalNextToEditor (term: BaseTerminalTabComponentType): Promise<void> {
