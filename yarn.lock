@@ -3224,10 +3224,10 @@ copy-text-to-clipboard@^3.2.2:
   resolved "https://registry.yarnpkg.com/copy-text-to-clipboard/-/copy-text-to-clipboard-3.2.2.tgz#99bc79db3f2d355ec33a08d573aff6804491ddb9"
   integrity sha512-T6SqyLd1iLuqPA90J5N4cTalrtovCySh58iiZDGJ6FGznbclKh4UI+FGacQSgFzwKG77W7XT5gwbVEbd9cIH1A==
 
-core-js-pure@^3.21.1:
-  version "3.48.0"
-  resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.48.0.tgz#7d5a3fe1ec3631b9aa76a81c843ac2ce918e5023"
-  integrity sha512-1slJgk89tWC51HQ1AEqG+s2VuwpTRr8ocu4n20QUcH1v9lAN0RXen0Q0AABa/DK1I7RrNWLucplOHMx8hfTGTw==
+core-js-pure@^3.49.0:
+  version "3.49.0"
+  resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.49.0.tgz#ff8436b7251a3832f5fdbbe3e10f7f2e58e51fb1"
+  integrity sha512-XM4RFka59xATyJv/cS3O3Kml72hQXUeGRuuTmMYFxwzc9/7C8OYTaIR/Ji+Yt8DXzsFLNhat15cE/JP15HrCgw==
 
 core-js@^2.4.0:
   version "2.6.12"
