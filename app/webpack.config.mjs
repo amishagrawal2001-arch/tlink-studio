@@ -48,7 +48,7 @@ export default () => ({
         minimize: false,
     },
     context: __dirname,
-    devtool: process.env.TLINK_DEV ? 'eval-source-map' : 'source-map',
+    devtool: process.env.TLINK_DEV ? 'eval-cheap-module-source-map' : 'source-map',
     cache: process.env.TLINK_DEV ? {
         type: 'filesystem',
         cacheDirectory: path.resolve(__dirname, 'node_modules', '.webpack-cache'),

@@ -61,6 +61,7 @@ function runYarn(args, cwd) {
         cwd,
         env: process.env,
         stdio: 'inherit',
+        shell: true,
     })
 }
 

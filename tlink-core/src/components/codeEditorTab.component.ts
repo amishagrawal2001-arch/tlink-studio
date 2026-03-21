@@ -335,6 +335,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyTextPlacementMode = false
     topologyStickyNotePlacementMode = false
     topologyNewLinksDirected = false
+    topologyNewLinksBidirectional = false
     topologyCurvedLinks = true
     topologyZoom = 1
     topologyPanX = 0
@@ -5109,8 +5110,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyContextMenuPoint = null
         this.topologyNodeContextMenuNodeId = itemId
         this.topologyNodeContextMenuKind = kind
-        const menuWidth = 160
-        const menuHeight = 44
+        const menuWidth = 200
+        const menuHeight = 220
         const padding = 8
         const maxX = Math.max(padding, (window.innerWidth || 0) - menuWidth - padding)
         const maxY = Math.max(padding, (window.innerHeight || 0) - menuHeight - padding)
@@ -5120,17 +5121,93 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
-    addLinkFromNodeContextMenu (): void {
-        const itemId = this.topologyNodeContextMenuNodeId
-        const kind = this.topologyNodeContextMenuKind
+    private closeNodeContextMenu (): void {
         this.topologyNodeContextMenuOpen = false
         this.topologyNodeContextMenuNodeId = null
+    }
+
+    addLinkFromNodeContextMenu (directed: boolean, bidirectional: boolean): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
         if (!itemId || !this.topologyData) {
             return
         }
+        this.topologyNewLinksDirected = directed
+        this.topologyNewLinksBidirectional = bidirectional
         this.topologyPendingLinkSourceId = itemId
         this.topologyPendingLinkSourceKind = kind
         this.setTopologySingleSelection(kind, itemId)
+        this.cdr.markForCheck()
+    }
+
+    editLabelFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        this.setTopologySingleSelection(kind, itemId)
+        if (kind === 'node') {
+            const node = this.topologyData.nodes.find(x => x.id === itemId)
+            if (node) {
+                this.beginTopologyInlineEdit('node', itemId, node.label || node.id)
+            }
+        } else {
+            const shape = this.topologyData.shapes.find(x => x.id === itemId)
+            if (shape) {
+                this.beginTopologyInlineEdit('shape', itemId, shape.label || '')
+            }
+        }
+    }
+
+    duplicateFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        if (kind === 'node') {
+            const node = this.topologyData.nodes.find(x => x.id === itemId)
+            if (node) {
+                const newNode = {
+                    ...JSON.parse(JSON.stringify(node)),
+                    id: this.createUniqueTopologyNodeId(node.type || 'node'),
+                    x: node.x + 30,
+                    y: node.y + 30,
+                }
+                this.topologyData.nodes.push(newNode)
+                this.persistTopologyToDoc()
+                this.setTopologySingleSelection('node', newNode.id)
+            }
+        } else {
+            const shape = this.topologyData.shapes.find(x => x.id === itemId)
+            if (shape) {
+                const newShape = {
+                    ...JSON.parse(JSON.stringify(shape)),
+                    id: this.createUniqueTopologyShapeId(),
+                    x: shape.x + 30,
+                    y: shape.y + 30,
+                }
+                this.topologyData.shapes.push(newShape)
+                this.persistTopologyToDoc()
+                this.setTopologySingleSelection('shape', newShape.id)
+            }
+        }
+        this.cdr.markForCheck()
+    }
+
+    deleteFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        this.setTopologySingleSelection(kind, itemId)
+        this.removeSelectedTopologyItem()
         this.cdr.markForCheck()
     }
 
@@ -5184,8 +5261,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                     labels: [],
                     color: this.getTopologyDefaultLinkColor(),
                     directed: this.topologyNewLinksDirected,
-                    bidirectional: false,
+                    bidirectional: this.topologyNewLinksBidirectional,
                 })
+                this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
             this.topologyPendingLinkSourceId = '__pending__'
@@ -5241,8 +5319,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                     labels: [],
                     color: this.getTopologyDefaultLinkColor(),
                     directed: this.topologyNewLinksDirected,
-                    bidirectional: false,
+                    bidirectional: this.topologyNewLinksBidirectional,
                 })
+                this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
             this.topologyPendingLinkSourceId = '__pending__'

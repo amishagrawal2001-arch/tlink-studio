@@ -12,7 +12,7 @@ const config = {
     },
     mode: process.env.TLINK_DEV ? 'development' : 'production',
     context: __dirname,
-    devtool: process.env.TLINK_DEV ? 'eval-source-map' : 'source-map',
+    devtool: process.env.TLINK_DEV ? 'eval-cheap-module-source-map' : 'source-map',
     cache: process.env.TLINK_DEV ? {
         type: 'filesystem',
         cacheDirectory: path.resolve(__dirname, 'node_modules', '.webpack-cache-main'),

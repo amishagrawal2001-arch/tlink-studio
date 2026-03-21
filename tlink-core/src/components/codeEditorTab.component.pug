@@ -50,7 +50,7 @@
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='diffWithSelected()', [disabled]='!pendingDiffDocId') Diff
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='compareWithDisk()', [disabled]='!documents.length') Diff vs disk
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='exitDiffMode()', [disabled]='viewMode!=="diff"') Exit diff
-        .toolbar-right
+            .toolbar-separator
             label.font-control.theme-mode-control
                 span.small-label Theme
                 select.form-select.form-select-sm.theme-mode-select((change)='setThemeMode($event.target.value)', [value]='themeMode')
@@ -68,20 +68,24 @@
                 select.form-select.form-select-sm.theme-preset-select((change)='onEditorThemePresetChange($event.target.value)', [value]='editorThemePresetValue')
                     option(value='custom') Custom
                     option(*ngFor='let preset of editorThemePresets', [value]='preset.color') {{preset.name}}
+        .toolbar-right
+            button.btn.btn-sm.btn-outline-secondary(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.active]='topologyCanvasMode', [disabled]='viewMode==="diff"') {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
+            .toolbar-separator
             .menu-container
                 button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics') Diagnostics
                 .dropdown-menu.diagnostics-panel(*ngIf='showDiagnostics', (click)='$event.stopPropagation()')
                     .diagnostics-row(*ngFor='let item of diagnosticsItems')
                         span.label {{item.label}}
                         code.value {{item.value}}
-            button.btn.btn-sm.btn-outline-secondary(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.active]='topologyCanvasMode', [disabled]='viewMode==="diff"') {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleSplitView()', [class.active]='!!splitEditor', [disabled]='viewMode==="diff"') Split
             button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleAutosave()', [class.active]='autosaveEnabled') Autosave
+            .toolbar-separator
             button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleIndentationStyle()', [class.active]='cachedActiveDoc?.insertSpaces') {{cachedActiveDoc?.insertSpaces ? 'Spaces' : 'Tabs'}}
             label.font-control
                 span.small-label Tab
                 input.form-control.form-control-sm(type='number', [value]='cachedActiveDoc?.tabSize || 4', min='1', max='12', (change)='setTabSize($event.target.valueAsNumber)')
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEOL()') {{statusEOL || 'EOL'}}
+            .toolbar-separator
             label.font-control
                 span.small-label Font
                 input.form-control.form-control-sm(type='number', [value]='fontSize', min='10', max='28', (change)='setFontSize($event.target.valueAsNumber)')
@@ -251,9 +255,26 @@
                         i.fa.fa-sticky-note(style='margin-right: 6px;')
                         | Add sticky note
                 .dropdown-menu.doc-context-menu.topology-context-menu(*ngIf='topologyNodeContextMenuOpen', [style.left.px]='topologyNodeContextMenuX', [style.top.px]='topologyNodeContextMenuY', (click)='$event.stopPropagation()')
-                    button(type='button', (click)='addLinkFromNodeContextMenu()')
+                    button(type='button', (click)='addLinkFromNodeContextMenu(false, false)')
                         i.fa.fa-link(style='margin-right: 6px;')
                         | Add link
+                    button(type='button', (click)='addLinkFromNodeContextMenu(true, false)')
+                        i.fa.fa-long-arrow-alt-right(style='margin-right: 6px;')
+                        | Add directed link
+                    button(type='button', (click)='addLinkFromNodeContextMenu(true, true)')
+                        i.fa.fa-exchange-alt(style='margin-right: 6px;')
+                        | Add bidirectional link
+                    .dropdown-divider
+                    button(type='button', (click)='editLabelFromNodeContextMenu()')
+                        i.fa.fa-pencil-alt(style='margin-right: 6px;')
+                        | Edit label
+                    button(type='button', (click)='duplicateFromNodeContextMenu()')
+                        i.fa.fa-clone(style='margin-right: 6px;')
+                        | Duplicate
+                    .dropdown-divider
+                    button.text-danger(type='button', (click)='deleteFromNodeContextMenu()')
+                        i.fa.fa-trash(style='margin-right: 6px;')
+                        | Delete
                 .topology-error(*ngIf='topologyParseError') {{topologyParseError}}
                 .topology-workspace(*ngIf='!topologyParseError', [class.inspector-visible]='hasTopologySelection')
                     .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)', (wheel)='onTopologyCanvasWheel($event)')

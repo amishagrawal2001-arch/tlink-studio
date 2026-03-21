@@ -1,3 +1,9 @@
+// Blacklist high-frequency DOM events from zone.js patching to avoid
+// triggering Angular change detection on every mousemove/scroll/resize.
+// Must be set before importing zone.js.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+(window as any).__zone_symbol__UNPATCHED_EVENTS = ['mousemove', 'mouseup', 'scroll', 'wheel', 'resize', 'pointermove', 'pointerup']
+
 import 'zone.js'
 import 'core-js/proposals/reflect-metadata'
 import 'rxjs'
