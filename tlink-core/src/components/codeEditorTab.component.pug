@@ -103,10 +103,37 @@
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleSplitView()', [class.active]='!!splitEditor', [disabled]='viewMode==="diff"') Split
             button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleAutosave()', [class.active]='autosaveEnabled') Autosave
             .toolbar-separator
-            button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleIndentationStyle()', [class.active]='cachedActiveDoc?.insertSpaces') {{cachedActiveDoc?.insertSpaces ? 'Spaces' : 'Tabs'}}
-            label.font-control
-                span.small-label Tab
-                input.form-control.form-control-sm(type='number', [value]='cachedActiveDoc?.tabSize || 4', min='1', max='12', (change)='setTabSize($event.target.valueAsNumber)')
+            .menu-container
+                button.btn.btn-sm.btn-outline-secondary.indent-toggle(type='button', (click)='toggleIndentMenu($event)', [class.active]='showIndentMenu')
+                    | {{cachedActiveDoc?.insertSpaces ? 'Spaces' : 'Tabs'}}: {{cachedActiveDoc?.tabSize || 4}}
+                    span.diag-badge.badge-warning(*ngIf='indentMixedWarning', title='Mixed indentation detected') !
+                .dropdown-menu.indent-panel(*ngIf='showIndentMenu', (click)='$event.stopPropagation()')
+                    .indent-section
+                        .indent-section-title Indentation Style
+                        .indent-row
+                            button.indent-option(type='button', [class.active]='cachedActiveDoc?.insertSpaces', (click)='toggleIndentationStyle()') Spaces
+                            button.indent-option(type='button', [class.active]='!cachedActiveDoc?.insertSpaces', (click)='toggleIndentationStyle()') Tabs
+                    .indent-section
+                        .indent-section-title Tab Size
+                        .indent-row
+                            button.indent-size(type='button', *ngFor='let s of [2, 4, 6, 8]', [class.active]='cachedActiveDoc?.tabSize === s', (click)='setTabSizePreset(s)') {{s}}
+                    .indent-section
+                        .indent-section-title Actions
+                        button.indent-action(type='button', (click)='autoDetectIndentation()')
+                            i.fas.fa-magic
+                            | Auto-detect
+                        button.indent-action(type='button', (click)='convertIndentationToSpaces()')
+                            i.fas.fa-arrow-right
+                            | Convert to Spaces
+                        button.indent-action(type='button', (click)='convertIndentationToTabs()')
+                            i.fas.fa-arrow-right
+                            | Convert to Tabs
+                        button.indent-action(type='button', (click)='trimTrailingAndCloseMenu()')
+                            i.fas.fa-broom
+                            | Trim Trailing Whitespace
+                    .indent-warning(*ngIf='indentMixedWarning')
+                        i.fas.fa-exclamation-triangle
+                        span Mixed indentation detected in this file
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEOL()') {{statusEOL || 'EOL'}}
             .toolbar-separator
             label.font-control
@@ -115,6 +142,294 @@
             label.font-control
                 span.small-label Line
                 input.form-control.form-control-sm(type='number', [value]='lineHeight', min='14', max='40', (change)='setLineHeight($event.target.valueAsNumber)')
+            .toolbar-separator
+            button.btn.btn-sm.btn-outline-secondary.help-toggle(type='button', (click)='toggleHelp()', title='Help')
+                i.fas.fa-question-circle
+    .help-overlay(*ngIf='showHelp', (click)='showHelp = false')
+        .help-modal((click)='$event.stopPropagation()')
+            .help-header
+                h3
+                    i.fas.fa-question-circle
+                    |  Tlink Studio Help
+                button.help-close(type='button', (click)='showHelp = false')
+                    i.fas.fa-times
+            .help-body
+                .help-intro
+                    .help-intro-icon
+                        i.fas.fa-code
+                    .help-intro-text
+                        h4 Welcome to Tlink Studio
+                        p Tlink Studio is a free, open-source, cross-platform desktop IDE that combines a full Monaco code editor, an integrated local terminal, and a visual topology diagram editor — all in one lightweight native app. Built with Electron, Angular, and Monaco Editor.
+                .help-section
+                    .help-section-title
+                        i.fas.fa-bullseye
+                        |  Purpose
+                    ul.help-list
+                        li
+                            strong Code Editing
+                            |  — Write and edit code with multi-document tabs, syntax highlighting, diff views, and intelligent diagnostics
+                        li
+                            strong Topology Diagrams
+                            |  — Design network topologies, system architectures, and infrastructure layouts visually alongside your code
+                        li
+                            strong Integrated Terminal
+                            |  — Run commands, execute scripts, and manage your development workflow without switching apps
+                        li
+                            strong Workspace Management
+                            |  — Organize projects with folder trees, git status tracking, session restore, and auto-save
+                .help-section
+                    .help-section-title
+                        i.fas.fa-file
+                        |  File Menu
+                    ul.help-list
+                        li
+                            strong New / New Topology / New Folder
+                            |  — Create a new empty file, topology diagram, or folder
+                        li
+                            strong Open / Open Local / Open Path
+                            |  — Open files from filesystem or by entering a path
+                        li
+                            strong Save / Save All / Save As
+                            |  — Save current file, all open files, or save with a new name
+                        li
+                            strong Duplicate / Move / Delete
+                            |  — Duplicate current file, move to new location, or delete from disk
+                        li
+                            strong Reopen Closed
+                            |  — Restore the last closed file tab
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-pencil-alt
+                        |  Edit Menu
+                    ul.help-list
+                        li
+                            strong Quick Open
+                            |  — Fuzzy file finder to quickly open files
+                        li
+                            strong Undo / Redo
+                            |  — Undo or redo last edit
+                        li
+                            strong Find / Replace
+                            |  — Search and replace text in the current file
+                        li
+                            strong Go to Line
+                            |  — Jump to a specific line number
+                        li
+                            strong Format / Format JSON
+                            |  — Auto-format code or pretty-print JSON
+                        li
+                            strong Case Transforms
+                            |  — Convert selection to uppercase, lowercase, or title case
+                        li
+                            strong Trim Trailing Spaces
+                            |  — Remove trailing whitespace from all lines
+                        li
+                            strong Send to Terminal / Run in Terminal
+                            |  — Send selected text or run current file in terminal
+                        li
+                            strong Wrap / Minimap
+                            |  — Toggle word wrap and minimap visibility
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-columns
+                        |  Diff Controls
+                    ul.help-list
+                        li
+                            strong Diff with...
+                            |  — Select another open file to compare against
+                        li
+                            strong Diff
+                            |  — Start the diff comparison
+                        li
+                            strong Diff vs Disk
+                            |  — Compare current edits with the saved version on disk
+                        li
+                            strong Exit Diff
+                            |  — Return to normal editing mode
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-palette
+                        |  Theme & Palette
+                    ul.help-list
+                        li
+                            strong Theme
+                            |  — Switch editor theme: Auto, Light, Dark, High Contrast, Solarized Light/Dark, Dracula, Monokai, Nord
+                        li
+                            strong Palette
+                            |  — Change color accent palette for the editor and topology canvas
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-stethoscope
+                        |  Diagnostics
+                    ul.help-list
+                        li
+                            strong Problems Tab
+                            |  — Live error and warning markers from Monaco language services. Click any marker to jump to its location
+                        li
+                            strong File Info Tab
+                            |  — Shows language, line count, character count, workspace root, and loaded plugins
+                        li
+                            strong Badge Indicators
+                            |  — Red badge for error count, orange badge for warning count on the toolbar button
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-columns
+                        |  Split View
+                    ul.help-list
+                        li
+                            strong Split
+                            |  — Open a side-by-side view of the same file for simultaneous editing at two locations
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-save
+                        |  Autosave
+                    ul.help-list
+                        li
+                            strong Autosave
+                            |  — Automatically saves files at regular intervals. Toggle on/off from the toolbar
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-indent
+                        |  Indentation
+                    ul.help-list
+                        li
+                            strong Spaces / Tabs
+                            |  — Toggle between using spaces or tab characters for indentation
+                        li
+                            strong Tab Size (2, 4, 6, 8)
+                            |  — Quick presets for indentation width
+                        li
+                            strong Auto-detect
+                            |  — Scan the file to automatically detect indentation style and size
+                        li
+                            strong Convert to Spaces / Tabs
+                            |  — Convert all existing indentation in the file
+                        li
+                            strong Mixed Indentation Warning
+                            |  — Orange indicator when file has both tabs and spaces
+                        li
+                            strong Trim Trailing Whitespace
+                            |  — Remove trailing spaces from all lines
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-exchange-alt
+                        |  EOL (End of Line)
+                    ul.help-list
+                        li
+                            strong LF / CRLF
+                            |  — Toggle line ending style. LF for macOS/Linux, CRLF for Windows
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-text-height
+                        |  Font & Line Height
+                    ul.help-list
+                        li
+                            strong Font (10–28)
+                            |  — Set editor font size in pixels
+                        li
+                            strong Line (14–40)
+                            |  — Set line height in pixels for comfortable reading
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-project-diagram
+                        |  Topology Canvas
+                    ul.help-list
+                        li
+                            strong Toggle
+                            |  — Switch between text code editor and visual topology diagram canvas
+                        li
+                            strong Nodes & Links
+                            |  — Create network nodes and connect them with directed or bidirectional links
+                        li
+                            strong Shapes
+                            |  — Add rectangles, circles, ovals, and text labels to the canvas
+                        li
+                            strong Snap to Grid
+                            |  — Align elements to a 24px grid for clean layouts
+                        li
+                            strong Export as PNG
+                            |  — Download the topology diagram as a high-resolution image
+                        li
+                            strong Undo / Redo
+                            |  — Revert or reapply topology changes (120-entry history)
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-keyboard
+                        |  Keyboard Shortcuts
+                    .help-shortcuts
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd S
+                            span Save file
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd Z
+                            span Undo
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd Shift
+                                | +
+                                kbd Z
+                            span Redo
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd F
+                            span Find
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd H
+                            span Replace
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd G
+                            span Go to line
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd P
+                            span Quick open
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd W
+                            span Close tab
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd \\
+                            span Toggle split view
+                        .help-shortcut-row
+                            .help-keys
+                                kbd Ctrl
+                                | +
+                                kbd `
+                            span Toggle terminal
     .editor-shell
         .tab-sidebar([style.width.px]='sidebarWidth')
             .sidebar-header

@@ -316,6 +316,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     fileMenuOpen = false
     editMenuOpen = false
     showDiagnostics = false
+    showIndentMenu = false
+    indentMixedWarning = false
+    showHelp = false
     diagnosticsTab: 'markers'|'info' = 'markers'
     editorMarkers: Array<{ severity: string, message: string, line: number, column: number, source: string }> = []
     private markerDisposable: any = null
@@ -10524,6 +10527,139 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         doc.insertSpaces = next
         doc.model.updateOptions({ insertSpaces: next })
         this.statusIndent = `${doc.insertSpaces ? 'Spaces' : 'Tabs'}:${doc.tabSize}`
+        this.detectMixedIndentation()
+    }
+
+    toggleHelp (): void {
+        this.showHelp = !this.showHelp
+    }
+
+    get isMac (): boolean {
+        return navigator.platform?.toUpperCase().includes('MAC') ?? false
+    }
+
+    get modKey (): string {
+        return this.isMac ? 'Cmd' : 'Ctrl'
+    }
+
+    toggleIndentMenu (event?: MouseEvent): void {
+        event?.preventDefault()
+        event?.stopPropagation()
+        this.showIndentMenu = !this.showIndentMenu
+        if (this.showIndentMenu) {
+            this.detectMixedIndentation()
+        }
+    }
+
+    setTabSizePreset (size: number): void {
+        this.setTabSize(size)
+        this.showIndentMenu = false
+    }
+
+    detectMixedIndentation (): void {
+        const doc = this.getActiveDoc()
+        if (!doc?.model) {
+            this.indentMixedWarning = false
+            return
+        }
+        const lineCount = Math.min(doc.model.getLineCount(), 500)
+        let hasTabs = false
+        let hasSpaces = false
+        for (let i = 1; i <= lineCount; i++) {
+            const line = doc.model.getLineContent(i)
+            const leading = line.match(/^(\s+)/)
+            if (!leading) { continue }
+            if (leading[1].includes('\t')) { hasTabs = true }
+            if (leading[1].includes(' ')) { hasSpaces = true }
+            if (hasTabs && hasSpaces) { break }
+        }
+        this.indentMixedWarning = hasTabs && hasSpaces
+    }
+
+    autoDetectIndentation (): void {
+        const doc = this.getActiveDoc()
+        if (!doc?.model) { return }
+        const lineCount = Math.min(doc.model.getLineCount(), 1000)
+        let tabLines = 0
+        let spaceLines = 0
+        const spaceCounts: Record<number, number> = {}
+        for (let i = 1; i <= lineCount; i++) {
+            const line = doc.model.getLineContent(i)
+            const leading = line.match(/^(\s+)/)
+            if (!leading) { continue }
+            if (leading[1][0] === '\t') {
+                tabLines++
+            } else {
+                spaceLines++
+                const len = leading[1].length
+                if (len >= 2 && len <= 8) {
+                    spaceCounts[len] = (spaceCounts[len] || 0) + 1
+                }
+            }
+        }
+        const useSpaces = spaceLines >= tabLines
+        doc.insertSpaces = useSpaces
+        if (useSpaces) {
+            // Detect most common indent size (2, 4, or 8)
+            let bestSize = 4
+            let bestCount = 0
+            for (const s of [2, 4, 8]) {
+                const count = spaceCounts[s] || 0
+                if (count > bestCount) {
+                    bestCount = count
+                    bestSize = s
+                }
+            }
+            doc.tabSize = bestSize
+        }
+        doc.model.updateOptions({ insertSpaces: doc.insertSpaces, tabSize: doc.tabSize })
+        this.statusIndent = `${doc.insertSpaces ? 'Spaces' : 'Tabs'}:${doc.tabSize}`
+        this.detectMixedIndentation()
+        this.showIndentMenu = false
+    }
+
+    convertIndentationToSpaces (): void {
+        const doc = this.getActiveDoc()
+        if (!doc?.model) { return }
+        const tabSize = doc.tabSize
+        const content = doc.model.getValue()
+        const converted = content.split('\n').map(line => {
+            const match = line.match(/^(\t+)(.*)$/)
+            if (!match) { return line }
+            return ' '.repeat(match[1].length * tabSize) + match[2]
+        }).join('\n')
+        doc.model.setValue(converted)
+        doc.insertSpaces = true
+        doc.model.updateOptions({ insertSpaces: true })
+        this.statusIndent = `Spaces:${doc.tabSize}`
+        this.detectMixedIndentation()
+        this.showIndentMenu = false
+    }
+
+    convertIndentationToTabs (): void {
+        const doc = this.getActiveDoc()
+        if (!doc?.model) { return }
+        const tabSize = doc.tabSize
+        const content = doc.model.getValue()
+        const converted = content.split('\n').map(line => {
+            const match = line.match(/^( +)(.*)$/)
+            if (!match) { return line }
+            const spaceCount = match[1].length
+            const tabs = Math.floor(spaceCount / tabSize)
+            const remainder = spaceCount % tabSize
+            return '\t'.repeat(tabs) + ' '.repeat(remainder) + match[2]
+        }).join('\n')
+        doc.model.setValue(converted)
+        doc.insertSpaces = false
+        doc.model.updateOptions({ insertSpaces: false })
+        this.statusIndent = `Tabs:${doc.tabSize}`
+        this.detectMixedIndentation()
+        this.showIndentMenu = false
+    }
+
+    trimTrailingAndCloseMenu (): void {
+        this.trimTrailingWhitespace()
+        this.showIndentMenu = false
     }
 
     toggleEditMenu (event?: MouseEvent): void {
@@ -13286,6 +13422,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         if (!target?.closest?.('.diagnostics-panel') && !target?.closest?.('.diagnostics-toggle')) {
             this.showDiagnostics = false
+        }
+        if (!target?.closest?.('.indent-panel') && !target?.closest?.('.indent-toggle')) {
+            this.showIndentMenu = false
         }
         // Don't close menus when clicking inside them.
         // Note: this also protects against capture-phase document listeners closing the menu
