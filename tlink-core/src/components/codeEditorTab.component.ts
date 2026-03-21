@@ -11240,8 +11240,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
             lineNumbers: 'on',
             lineNumbersMinChars: 2,
-            lineDecorationsWidth: 10,
-            glyphMargin: true,
+            lineDecorationsWidth: 6,
+            glyphMargin: false,
             selectOnLineNumbers: true,
             renderLineHighlight: 'all',
             renderLineHighlightOnlyWhenFocus: false,
@@ -12506,12 +12506,22 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
             const browserEvent = event?.event?.browserEvent ?? event?.event ?? null
             const clickCount = Number(browserEvent?.detail ?? event?.event?.detail ?? 1)
-            const isGutterClick = (
+            // Detect gutter clicks by target type OR by mouse position
+            // (clicking empty space in the margin may not register as a GUTTER_* type)
+            const isGutterTargetType = (
                 targetType === mouseTargetType.GUTTER_LINE_NUMBERS
                 || targetType === mouseTargetType.GUTTER_GLYPH_MARGIN
                 || targetType === mouseTargetType.GUTTER_LINE_DECORATIONS
                 || targetType === mouseTargetType.GUTTER_VIEW_ZONE
             )
+            const layoutInfo = editor.getLayoutInfo?.()
+            const contentLeft = layoutInfo?.contentLeft ?? 0
+            const mouseX = event?.event?.posx ?? event?.event?.browserEvent?.offsetX ?? -1
+            const editorDom = editor.getDomNode?.()
+            const editorLeft = editorDom?.getBoundingClientRect?.()?.left ?? 0
+            const relativeX = mouseX - editorLeft
+            const isGutterByPosition = contentLeft > 0 && relativeX >= 0 && relativeX < contentLeft
+            const isGutterClick = isGutterTargetType || isGutterByPosition
             if (isGutterClick) {
                 const anchorLine = this.editorLineSelectionAnchorByEditor.get(editor) ?? lineNumber
                 if (browserEvent?.shiftKey) {
@@ -12562,13 +12572,20 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             if (!model || !Number.isFinite(lineNumber) || lineNumber < 1) {
                 return
             }
-            const isGutterDrag = (
+            const isGutterDragType = (
                 targetType === mouseTargetType.GUTTER_LINE_NUMBERS
                 || targetType === mouseTargetType.GUTTER_GLYPH_MARGIN
                 || targetType === mouseTargetType.GUTTER_LINE_DECORATIONS
                 || targetType === mouseTargetType.GUTTER_VIEW_ZONE
             )
-            if (!isGutterDrag) {
+            const dragLayoutInfo = editor.getLayoutInfo?.()
+            const dragContentLeft = dragLayoutInfo?.contentLeft ?? 0
+            const dragMouseX = event?.event?.posx ?? event?.event?.browserEvent?.offsetX ?? -1
+            const dragEditorDom = editor.getDomNode?.()
+            const dragEditorLeft = dragEditorDom?.getBoundingClientRect?.()?.left ?? 0
+            const dragRelativeX = dragMouseX - dragEditorLeft
+            const isGutterDragByPos = dragContentLeft > 0 && dragRelativeX >= 0 && dragRelativeX < dragContentLeft
+            if (!isGutterDragType && !isGutterDragByPos) {
                 return
             }
             const anchorLine = this.editorLineSelectionAnchorByEditor.get(editor)
