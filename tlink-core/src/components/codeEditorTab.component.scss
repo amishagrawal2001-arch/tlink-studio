@@ -63,6 +63,44 @@
         justify-content: flex-end;
     }
 
+    .topology-mode-toggle {
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+
+        &.mode-editor {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            color: #fff;
+
+            &:hover:not(:disabled) {
+                background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+                box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+            }
+        }
+
+        &.mode-canvas {
+            background: linear-gradient(135deg, #06b6d4, #22d3ee);
+            color: #fff;
+
+            &:hover:not(:disabled) {
+                background: linear-gradient(135deg, #0891b2, #06b6d4);
+                box-shadow: 0 2px 8px rgba(6, 182, 212, 0.4);
+            }
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+    }
+
     .toolbar-separator {
         width: 1px;
         height: 18px;
@@ -1665,6 +1703,37 @@
 :host ::ng-deep .monaco-editor .view-overlays [class*="wordHighlight"] {
     background-color: rgba(var(--tlink-editor-selection-rgb, 79, 156, 255), 0.06) !important;
     border-color: rgba(var(--tlink-editor-selection-rgb, 79, 156, 255), 0.14) !important;
+}
+
+/* Glyph margin: selection arrow hint on hover */
+:host ::ng-deep .monaco-editor .margin-view-overlays .line-numbers {
+    cursor: pointer;
+}
+
+:host ::ng-deep .monaco-editor .glyph-margin {
+    cursor: pointer;
+}
+
+:host ::ng-deep .monaco-editor .margin-view-overlays > div:hover .line-numbers {
+    color: var(--theme-accent, #8b5cf6) !important;
+    font-weight: 700;
+}
+
+:host ::ng-deep .monaco-editor .glyph-margin > div:hover::after {
+    content: '\25B6';
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    color: var(--theme-accent, #8b5cf6);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* Current line highlight - full width band */
+:host ::ng-deep .monaco-editor .current-line-margin {
+    border-left: 2px solid var(--theme-accent, #8b5cf6) !important;
 }
 
 .editor-pane {

@@ -69,7 +69,9 @@
                     option(value='custom') Custom
                     option(*ngFor='let preset of editorThemePresets', [value]='preset.color') {{preset.name}}
         .toolbar-right
-            button.btn.btn-sm.btn-outline-secondary(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.active]='topologyCanvasMode', [disabled]='viewMode==="diff"') {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
+            button.btn.btn-sm.topology-mode-toggle(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.mode-canvas]='topologyCanvasMode', [class.mode-editor]='!topologyCanvasMode', [disabled]='viewMode==="diff"')
+                i.fas(style='margin-right: 5px;', [ngClass]='topologyCanvasMode ? "fa-code" : "fa-project-diagram"')
+                | {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
             .toolbar-separator
             .menu-container
                 button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics') Diagnostics
