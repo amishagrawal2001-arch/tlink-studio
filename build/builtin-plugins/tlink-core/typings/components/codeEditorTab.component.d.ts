@@ -176,6 +176,7 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     documents: EditorDocument[];
     activeDocId: string | null;
     splitDocId: string | null;
+    cachedActiveDoc: EditorDocument | null;
     recentFiles: string[];
     closedDocuments: EditorDocumentSnapshot[];
     editingDocId: string | null;
@@ -262,6 +263,11 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     topologyContextMenuX: number;
     topologyContextMenuY: number;
     private topologyContextMenuPoint;
+    topologyNodeContextMenuOpen: boolean;
+    topologyNodeContextMenuX: number;
+    topologyNodeContextMenuY: number;
+    private topologyNodeContextMenuNodeId;
+    private topologyNodeContextMenuKind;
     selectedFilePathKeys: Set<string>;
     selectedFolderPathKeys: Set<string>;
     private fileSelectionAnchorKey;
@@ -329,6 +335,8 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     private resizingSidebar;
     private resizeStartX;
     private resizeStartWidth;
+    private mousemoveRafPending;
+    private resizeRafPending;
     private topologyDragNodeId;
     private topologyDragOffsetX;
     private topologyDragOffsetY;
@@ -664,6 +672,10 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     duplicateSelectedTopologyNodes(): void;
     onTopologyCanvasBackgroundMouseDown(event: MouseEvent): void;
     onTopologyCanvasContextMenu(event: MouseEvent): void;
+    onTopologyNodeContextMenu(event: MouseEvent, nodeId: string): void;
+    onTopologyShapeContextMenu(event: MouseEvent, shapeId: string): void;
+    private showTopologyItemContextMenu;
+    addLinkFromNodeContextMenu(): void;
     addStickyNoteFromTopologyContextMenu(): void;
     onTopologyCanvasDoubleClick(event: MouseEvent): void;
     onTopologyNodeClick(event: MouseEvent, nodeId: string): void;
@@ -779,6 +791,9 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     }): string;
     private getVisibleDiffCandidates;
     private getFallbackDiffCandidates;
+    private _diffCandidatesCache;
+    private _diffCandidatesCacheDocCount;
+    private _diffCandidatesCacheActiveId;
     get diffCandidates(): EditorDocument[];
     get editorThemePresetValue(): string;
     private getDiffDocContextLabel;
@@ -966,6 +981,7 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     private loadRecent;
     private rememberRecent;
     private getActiveEditor;
+    refreshActiveDocCache(): void;
     private getActiveDoc;
     private disposeEditors;
     private disposeModels;
@@ -986,6 +1002,7 @@ export declare class CodeEditorTabComponent extends BaseTabComponent implements 
     closeEditMenu(event?: MouseEvent): void;
     closeContextMenusOnRightClick(event?: MouseEvent): void;
     onSidebarDrag(event: MouseEvent): void;
+    private handleMousemove;
     endSidebarDrag(): void;
     onWindowResize(): void;
     private parseAnsi;

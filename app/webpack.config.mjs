@@ -48,10 +48,14 @@ export default () => ({
         minimize: false,
     },
     context: __dirname,
-    devtool: 'source-map',
+    devtool: process.env.TLINK_DEV ? 'eval-source-map' : 'source-map',
+    cache: process.env.TLINK_DEV ? {
+        type: 'filesystem',
+        cacheDirectory: path.resolve(__dirname, 'node_modules', '.webpack-cache'),
+    } : false,
     output: {
         path: path.join(__dirname, 'dist'),
-        pathinfo: true,
+        pathinfo: !!process.env.TLINK_DEV,
         filename: '[name].js',
         publicPath: 'auto',
     },

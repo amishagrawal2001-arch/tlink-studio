@@ -12,10 +12,14 @@ const config = {
     },
     mode: process.env.TLINK_DEV ? 'development' : 'production',
     context: __dirname,
-    devtool: 'source-map',
+    devtool: process.env.TLINK_DEV ? 'eval-source-map' : 'source-map',
+    cache: process.env.TLINK_DEV ? {
+        type: 'filesystem',
+        cacheDirectory: path.resolve(__dirname, 'node_modules', '.webpack-cache-main'),
+    } : false,
     output: {
         path: path.join(__dirname, 'dist'),
-        pathinfo: true,
+        pathinfo: !!process.env.TLINK_DEV,
         filename: '[name].js',
     },
     resolve: {

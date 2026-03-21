@@ -238,6 +238,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     documents: EditorDocument[] = []
     activeDocId: string|null = null
     splitDocId: string|null = null
+    cachedActiveDoc: EditorDocument|null = null
     recentFiles: string[] = []
     closedDocuments: EditorDocumentSnapshot[] = []
     editingDocId: string|null = null
@@ -365,6 +366,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyContextMenuX = 0
     topologyContextMenuY = 0
     private topologyContextMenuPoint: { x: number, y: number }|null = null
+    topologyNodeContextMenuOpen = false
+    topologyNodeContextMenuX = 0
+    topologyNodeContextMenuY = 0
+    private topologyNodeContextMenuNodeId: string|null = null
+    private topologyNodeContextMenuKind: 'node'|'shape' = 'node'
     selectedFilePathKeys = new Set<string>()
     selectedFolderPathKeys = new Set<string>()
     private fileSelectionAnchorKey: string|null = null
@@ -511,6 +517,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private resizingSidebar = false
     private resizeStartX = 0
     private resizeStartWidth = 0
+    private mousemoveRafPending = false
+    private resizeRafPending = false
     private topologyDragNodeId: string|null = null
     private topologyDragOffsetX = 0
     private topologyDragOffsetY = 0
@@ -4994,6 +5002,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     onTopologyCanvasBackgroundMouseDown (event: MouseEvent): void {
         this.topologyContextMenuOpen = false
         this.topologyContextMenuPoint = null
+        this.topologyNodeContextMenuOpen = false
+        this.topologyNodeContextMenuNodeId = null
         const target = event.target as HTMLElement | null
         if (target?.closest('.topology-node') || target?.closest('.topology-link') || target?.closest('.topology-link-hit') || target?.closest('.topology-link-end-hit') || target?.closest('.topology-link-label') || target?.closest('.topology-shape') || target?.closest('.topology-text-label') || target?.closest('.topology-link-handle') || target?.closest('.topology-link-inline-editor')) {
             return
@@ -5078,6 +5088,49 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyContextMenuX = Math.max(padding, Math.min(event.clientX, maxX))
         this.topologyContextMenuY = Math.max(padding, Math.min(event.clientY, maxY))
         this.topologyContextMenuOpen = true
+        this.cdr.markForCheck()
+    }
+
+    onTopologyNodeContextMenu (event: MouseEvent, nodeId: string): void {
+        this.showTopologyItemContextMenu(event, nodeId, 'node')
+    }
+
+    onTopologyShapeContextMenu (event: MouseEvent, shapeId: string): void {
+        this.showTopologyItemContextMenu(event, shapeId, 'shape')
+    }
+
+    private showTopologyItemContextMenu (event: MouseEvent, itemId: string, kind: 'node'|'shape'): void {
+        if (!this.topologyData) {
+            return
+        }
+        event.preventDefault()
+        event.stopPropagation()
+        this.topologyContextMenuOpen = false
+        this.topologyContextMenuPoint = null
+        this.topologyNodeContextMenuNodeId = itemId
+        this.topologyNodeContextMenuKind = kind
+        const menuWidth = 160
+        const menuHeight = 44
+        const padding = 8
+        const maxX = Math.max(padding, (window.innerWidth || 0) - menuWidth - padding)
+        const maxY = Math.max(padding, (window.innerHeight || 0) - menuHeight - padding)
+        this.topologyNodeContextMenuX = Math.max(padding, Math.min(event.clientX, maxX))
+        this.topologyNodeContextMenuY = Math.max(padding, Math.min(event.clientY, maxY))
+        this.topologyNodeContextMenuOpen = true
+        this.cdr.markForCheck()
+    }
+
+    addLinkFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.topologyNodeContextMenuOpen = false
+        this.topologyNodeContextMenuNodeId = null
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        this.topologyPendingLinkSourceId = itemId
+        this.topologyPendingLinkSourceKind = kind
+        this.setTopologySingleSelection(kind, itemId)
         this.cdr.markForCheck()
     }
 
@@ -7876,12 +7929,20 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return result
     }
 
+    private _diffCandidatesCache: EditorDocument[] | null = null
+    private _diffCandidatesCacheDocCount = -1
+    private _diffCandidatesCacheActiveId: string | null = null
+
     get diffCandidates (): EditorDocument[] {
-        const visible = this.getVisibleDiffCandidates()
-        if (visible.length) {
-            return visible
+        if (this._diffCandidatesCache && this._diffCandidatesCacheDocCount === this.documents.length && this._diffCandidatesCacheActiveId === this.activeDocId) {
+            return this._diffCandidatesCache
         }
-        return this.getFallbackDiffCandidates()
+        const visible = this.getVisibleDiffCandidates()
+        const result = visible.length ? visible : this.getFallbackDiffCandidates()
+        this._diffCandidatesCache = result
+        this._diffCandidatesCacheDocCount = this.documents.length
+        this._diffCandidatesCacheActiveId = this.activeDocId
+        return result
     }
 
     get editorThemePresetValue (): string {
@@ -8870,10 +8931,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (this.activeDocId === docId) {
             const next = this.documents[0]
             this.activeDocId = next?.id ?? null
+            this.refreshActiveDocCache()
             this.primaryEditor?.setModel(next?.model ?? null)
         }
         if (this.splitDocId === docId) {
             this.splitDocId = null
+            this.refreshActiveDocCache()
             this.splitEditor?.setModel(this.getActiveDoc()?.model ?? null)
         }
 
@@ -10321,6 +10384,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.splitEditor = null
             this.splitDocId = null
             this.focusedEditor = 'primary'
+            this.refreshActiveDocCache()
             this.layoutEditors()
             this.persistState()
             return
@@ -10380,6 +10444,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return
         }
         this.activeDocId = docId
+        this.refreshActiveDocCache()
         if (this.pendingDiffDocId === docId) {
             this.pendingDiffDocId = null
         }
@@ -12628,6 +12693,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return this.primaryEditor
     }
 
+    refreshActiveDocCache (): void {
+        this.cachedActiveDoc = this.getActiveDoc()
+    }
+
     private getActiveDoc (): EditorDocument|null {
         if (this.viewMode === 'editor') {
             if (this.splitEditor?.hasTextFocus?.() && this.splitDocId) {
@@ -12743,6 +12812,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.folderContextMenuOpen = false
         this.fileContextMenuOpen = false
         this.topologyContextMenuOpen = false
+        this.topologyNodeContextMenuOpen = false
         // Clear menu state
         this.docContextMenuDocId = null
         this.folderContextMenuPath = null
@@ -12752,6 +12822,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.fileContextMenuPath = null
         this.fileContextMenuPaths = []
         this.topologyContextMenuPoint = null
+        this.topologyNodeContextMenuNodeId = null
     }
 
     @HostListener('document:contextmenu', ['$event'])
@@ -12766,6 +12837,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.folderContextMenuOpen = false
         this.fileContextMenuOpen = false
         this.topologyContextMenuOpen = false
+        this.topologyNodeContextMenuOpen = false
         this.docContextMenuDocId = null
         this.folderContextMenuPath = null
         this.folderContextMenuPaths = []
@@ -12774,10 +12846,25 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.fileContextMenuPath = null
         this.fileContextMenuPaths = []
         this.topologyContextMenuPoint = null
+        this.topologyNodeContextMenuNodeId = null
     }
 
     @HostListener('document:mousemove', ['$event'])
     onSidebarDrag (event: MouseEvent): void {
+        if (!this.topologyPanDragActive && !this.topologyFreeLinkCreating && !this.topologyMarqueeActive && !this.topologyResizeNodeId && !this.topologyDragNodeId && !this.topologyDragFreeLinkId && !this.topologyResizeTextId && !this.topologyDragTextId && !this.topologyResizeShapeId && !this.topologyDragShapeId && !this.resizingSidebar) {
+            return
+        }
+        if (this.mousemoveRafPending) {
+            return
+        }
+        this.mousemoveRafPending = true
+        requestAnimationFrame(() => {
+            this.mousemoveRafPending = false
+            this.handleMousemove(event)
+        })
+    }
+
+    private handleMousemove (event: MouseEvent): void {
         if (this.topologyPanDragActive) {
             this.updateTopologyPanDrag(event)
             return
@@ -12913,12 +13000,16 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     @HostListener('window:resize')
     onWindowResize (): void {
-        this.layoutEditors()
-        this.updateVisibleTreeItems(true)
-        if (this.topologyCanvasMode) {
-            this.cdr.markForCheck()
+        if (this.resizeRafPending) {
+            return
         }
-        this.cdr.markForCheck()
+        this.resizeRafPending = true
+        requestAnimationFrame(() => {
+            this.resizeRafPending = false
+            this.layoutEditors()
+            this.updateVisibleTreeItems(true)
+            this.cdr.markForCheck()
+        })
     }
 
     private parseAnsi (input: string): { text: string, segments: Array<{ start: number, end: number, classes: string }> } {
