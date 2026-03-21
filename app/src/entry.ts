@@ -38,7 +38,7 @@ if (process.env.TLINK_DEV && !process.env.TLINK_FORCE_ANGULAR_PROD) {
 }
 
 const isStudioOnlyApp = (process.env.TLINK_STUDIO_APP ?? '1') === '1'
-const STUDIO_PLUGIN_PACKAGES = ['tlink-core', 'tlink-studio-shell']
+const STUDIO_PLUGIN_PACKAGES = ['tlink-core', 'tlink-studio-shell', 'tlink-local', 'tlink-terminal', 'tlink-settings']
 const STUDIO_PLUGIN_PACKAGE_SET = new Set(STUDIO_PLUGIN_PACKAGES)
 
 function enforceStudioPluginSet (plugins: PluginInfo[]): PluginInfo[] {
