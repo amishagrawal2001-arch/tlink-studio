@@ -244,7 +244,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     closedDocuments: EditorDocumentSnapshot[] = []
     editingDocId: string|null = null
     editingDocName = ''
-    wordWrapEnabled = false
+    wordWrapEnabled = true
     minimapEnabled = false
     themeMode: EditorThemeMode = 'auto'
     editorThemeColor = '#4f9cff'
@@ -11436,13 +11436,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return 'plaintext'
     }
 
+    private isUntitledName (name: string): boolean {
+        return /^Untitled-\d+$/i.test(name)
+    }
+
     private async saveDocument (doc: EditorDocument): Promise<boolean> {
         if (!this.isModelAlive(doc)) { return false }
         const content = doc.model.getValue()
         const data = new TextEncoder().encode(content)
 
         const initialPath = doc.path
-        if (initialPath) {
+        if (initialPath && !this.isUntitledName(doc.name)) {
             if (this.isPathHiddenInTree(initialPath)) {
                 return false
             }
@@ -11492,6 +11496,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             doc.lastSavedValue = content
             const newPath = (download as any).filePath ?? null
             if (newPath) {
+                // Clean up old untitled file if saving to a new location.
+                const oldPath = initialPath
+                if (oldPath && !this.isSameFsPath(oldPath, newPath)) {
+                    try { fsSync.unlinkSync(oldPath) } catch { /* already gone */ }
+                    this.hideTreePath(oldPath)
+                }
                 doc.path = newPath
                 doc.name = path.basename(newPath)
                 doc.folderPath = this.getFolderForPath(newPath) ?? doc.folderPath
@@ -11505,6 +11515,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
             this.updateTitle(doc)
             this.syncOpenedFileScopes()
+            this.updateTreeItems()
             this.persistState()
             return true
         } catch (err: any) {

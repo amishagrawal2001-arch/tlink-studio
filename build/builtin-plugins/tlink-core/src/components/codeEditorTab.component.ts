@@ -28,6 +28,7 @@ interface EditorDocumentSnapshot {
     insertSpaces: boolean
     isDirty?: boolean
     lastSavedValue?: string
+    viewState?: any
 }
 
 interface EditorDocument extends EditorDocumentSnapshot {
@@ -243,7 +244,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     closedDocuments: EditorDocumentSnapshot[] = []
     editingDocId: string|null = null
     editingDocName = ''
-    wordWrapEnabled = false
+    wordWrapEnabled = true
     minimapEnabled = false
     themeMode: EditorThemeMode = 'auto'
     editorThemeColor = '#4f9cff'
@@ -335,7 +336,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyTextPlacementMode = false
     topologyStickyNotePlacementMode = false
     topologyNewLinksDirected = false
+    topologyNewLinksBidirectional = false
     topologyCurvedLinks = true
+    topologySnapToGrid = false
+    private topologyGridSize = 24
     topologyZoom = 1
     topologyPanX = 0
     topologyPanY = 0
@@ -387,6 +391,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private folderTreeModes = new Map<string, FolderTreeMode>()
     private _treeItems: Array<{ node: TreeNode, depth: number }> = []
     private _visibleTreeItems: Array<{ node: TreeNode, depth: number }> = []
+    gitFileStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
+    private gitStatusTimer?: number
+    private gitStatusRefreshMs = 5000
     private treeKeyboardActive = false
     private canCloseCheckPromise: Promise<boolean>|null = null
     private confirmedCloseDiscardSignature: string|null = null
@@ -509,6 +516,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private fileMenuHoverCloseTimer?: number
     private editMenuHoverCloseTimer?: number
     private readonly menuHoverCloseDelayMs = 140
+    private editorViewStates = new Map<string, any>()
     private treeBuildNonce = 0
     private deletingPathKeys = new Set<string>()
     private deleteInProgress = false
@@ -4770,6 +4778,205 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
+    toggleTopologySnapToGrid (): void {
+        this.topologySnapToGrid = !this.topologySnapToGrid
+        this.cdr.markForCheck()
+    }
+
+    private snapToGrid (value: number): number {
+        return Math.round(value / this.topologyGridSize) * this.topologyGridSize
+    }
+
+    async exportTopologyAsImage (): Promise<void> {
+        if (!this.topologyData) {
+            return
+        }
+        const data = this.topologyData
+        const nodes = data.nodes || []
+        const links = data.links || []
+        const shapes = data.shapes || []
+        const texts = data.texts || []
+        if (!nodes.length && !shapes.length && !texts.length) {
+            return
+        }
+
+        // Calculate bounds
+        const allX: number[] = []
+        const allY: number[] = []
+        for (const n of nodes) {
+            allX.push(n.x, n.x + (n.width || 176))
+            allY.push(n.y, n.y + (n.height || 72))
+        }
+        for (const s of shapes) {
+            allX.push(s.x, s.x + s.width)
+            allY.push(s.y, s.y + s.height)
+        }
+        for (const t of texts) {
+            allX.push(t.x, t.x + 120)
+            allY.push(t.y, t.y + 30)
+        }
+        const minX = Math.min(...allX)
+        const minY = Math.min(...allY)
+        const maxX = Math.max(...allX)
+        const maxY = Math.max(...allY)
+        const padding = 50
+        const width = Math.max(300, maxX - minX + padding * 2)
+        const height = Math.max(200, maxY - minY + padding * 2)
+        const offsetX = -minX + padding
+        const offsetY = -minY + padding
+        const scale = 2
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width * scale
+        canvas.height = height * scale
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+            return
+        }
+        ctx.scale(scale, scale)
+
+        // Background
+        const bgColor = getComputedStyle(this.topologyCanvas?.nativeElement ?? document.body).backgroundColor || '#1e1e2e'
+        ctx.fillStyle = bgColor
+        ctx.fillRect(0, 0, width, height)
+
+        // Draw grid
+        ctx.strokeStyle = 'rgba(128,128,128,0.08)'
+        ctx.lineWidth = 1
+        for (let x = 0; x < width; x += 24) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke()
+        }
+        for (let y = 0; y < height; y += 24) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke()
+        }
+
+        // Helper: get node/shape center
+        const getCenter = (id: string | undefined, kind: string | undefined): { x: number, y: number } | null => {
+            if (kind === 'shape' || (!kind && shapes.find(s => s.id === id))) {
+                const s = shapes.find(s => s.id === id)
+                if (s) return { x: s.x + s.width / 2 + offsetX, y: s.y + s.height / 2 + offsetY }
+            }
+            const n = nodes.find(n => n.id === id)
+            if (n) return { x: n.x + (n.width || 176) / 2 + offsetX, y: n.y + (n.height || 72) / 2 + offsetY }
+            return null
+        }
+
+        // Draw links
+        for (const link of links) {
+            const from = getCenter(link.from, link.fromKind)
+            const to = getCenter(link.to, link.toKind)
+            if (!from || !to) continue
+            ctx.strokeStyle = link.color || '#888'
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.moveTo(from.x, from.y)
+            ctx.lineTo(to.x, to.y)
+            ctx.stroke()
+            // Arrow for directed
+            if (link.directed || link.bidirectional) {
+                const angle = Math.atan2(to.y - from.y, to.x - from.x)
+                const arrowLen = 10
+                ctx.fillStyle = link.color || '#888'
+                ctx.beginPath()
+                ctx.moveTo(to.x, to.y)
+                ctx.lineTo(to.x - arrowLen * Math.cos(angle - 0.4), to.y - arrowLen * Math.sin(angle - 0.4))
+                ctx.lineTo(to.x - arrowLen * Math.cos(angle + 0.4), to.y - arrowLen * Math.sin(angle + 0.4))
+                ctx.closePath()
+                ctx.fill()
+            }
+            if (link.bidirectional) {
+                const angle = Math.atan2(from.y - to.y, from.x - to.x)
+                const arrowLen = 10
+                ctx.fillStyle = link.color || '#888'
+                ctx.beginPath()
+                ctx.moveTo(from.x, from.y)
+                ctx.lineTo(from.x - arrowLen * Math.cos(angle - 0.4), from.y - arrowLen * Math.sin(angle - 0.4))
+                ctx.lineTo(from.x - arrowLen * Math.cos(angle + 0.4), from.y - arrowLen * Math.sin(angle + 0.4))
+                ctx.closePath()
+                ctx.fill()
+            }
+        }
+
+        // Draw shapes
+        for (const shape of shapes) {
+            const sx = shape.x + offsetX
+            const sy = shape.y + offsetY
+            ctx.strokeStyle = shape.color || '#06b6d4'
+            ctx.lineWidth = 2
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.08)'
+            if (shape.kind === 'circle' || shape.kind === 'oval') {
+                ctx.beginPath()
+                ctx.ellipse(sx + shape.width / 2, sy + shape.height / 2, shape.width / 2, shape.height / 2, 0, 0, Math.PI * 2)
+                ctx.fill()
+                ctx.stroke()
+            } else {
+                ctx.fillRect(sx, sy, shape.width, shape.height)
+                ctx.strokeRect(sx, sy, shape.width, shape.height)
+            }
+            if (shape.label) {
+                ctx.fillStyle = shape.color || '#06b6d4'
+                ctx.font = '12px Inter, sans-serif'
+                ctx.textAlign = 'center'
+                ctx.fillText(shape.label, sx + shape.width / 2, sy + shape.height / 2 + 4, shape.width - 8)
+            }
+        }
+
+        // Draw nodes
+        for (const node of nodes) {
+            const nx = node.x + offsetX
+            const ny = node.y + offsetY
+            const nw = node.width || 176
+            const nh = node.height || 72
+            const nodeColor = node.color || '#8b5cf6'
+            // Node box
+            ctx.fillStyle = bgColor
+            ctx.strokeStyle = nodeColor
+            ctx.lineWidth = 2
+            const r = 8
+            ctx.beginPath()
+            ctx.moveTo(nx + r, ny)
+            ctx.lineTo(nx + nw - r, ny)
+            ctx.quadraticCurveTo(nx + nw, ny, nx + nw, ny + r)
+            ctx.lineTo(nx + nw, ny + nh - r)
+            ctx.quadraticCurveTo(nx + nw, ny + nh, nx + nw - r, ny + nh)
+            ctx.lineTo(nx + r, ny + nh)
+            ctx.quadraticCurveTo(nx, ny + nh, nx, ny + nh - r)
+            ctx.lineTo(nx, ny + r)
+            ctx.quadraticCurveTo(nx, ny, nx + r, ny)
+            ctx.closePath()
+            ctx.fill()
+            ctx.stroke()
+            // Label
+            ctx.fillStyle = '#e0e0e0'
+            ctx.font = 'bold 13px Inter, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText(node.label || node.id, nx + nw / 2, ny + nh / 2 - 4, nw - 16)
+            // Type
+            ctx.fillStyle = '#888'
+            ctx.font = '10px Inter, sans-serif'
+            ctx.fillText(node.type || '', nx + nw / 2, ny + nh / 2 + 12, nw - 16)
+        }
+
+        // Draw text labels
+        for (const t of texts) {
+            ctx.fillStyle = t.sticky ? '#fef3c7' : (t.color || '#ccc')
+            ctx.font = '12px Inter, sans-serif'
+            ctx.textAlign = 'left'
+            ctx.fillText(t.text || '', t.x + offsetX, t.y + offsetY + 14, 300)
+        }
+
+        // Download
+        canvas.toBlob(blob => {
+            if (blob) {
+                const a = document.createElement('a')
+                a.href = URL.createObjectURL(blob)
+                a.download = `${data.name || 'topology'}.png`
+                a.click()
+                URL.revokeObjectURL(a.href)
+            }
+        }, 'image/png')
+    }
+
     fitTopologyToCanvas (): void {
         if (!this.topologyData || !this.topologyCanvas?.nativeElement) {
             this.resetTopologyViewport()
@@ -5109,8 +5316,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyContextMenuPoint = null
         this.topologyNodeContextMenuNodeId = itemId
         this.topologyNodeContextMenuKind = kind
-        const menuWidth = 160
-        const menuHeight = 44
+        const menuWidth = 200
+        const menuHeight = 220
         const padding = 8
         const maxX = Math.max(padding, (window.innerWidth || 0) - menuWidth - padding)
         const maxY = Math.max(padding, (window.innerHeight || 0) - menuHeight - padding)
@@ -5120,17 +5327,93 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
-    addLinkFromNodeContextMenu (): void {
-        const itemId = this.topologyNodeContextMenuNodeId
-        const kind = this.topologyNodeContextMenuKind
+    private closeNodeContextMenu (): void {
         this.topologyNodeContextMenuOpen = false
         this.topologyNodeContextMenuNodeId = null
+    }
+
+    addLinkFromNodeContextMenu (directed: boolean, bidirectional: boolean): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
         if (!itemId || !this.topologyData) {
             return
         }
+        this.topologyNewLinksDirected = directed
+        this.topologyNewLinksBidirectional = bidirectional
         this.topologyPendingLinkSourceId = itemId
         this.topologyPendingLinkSourceKind = kind
         this.setTopologySingleSelection(kind, itemId)
+        this.cdr.markForCheck()
+    }
+
+    editLabelFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        this.setTopologySingleSelection(kind, itemId)
+        if (kind === 'node') {
+            const node = this.topologyData.nodes.find(x => x.id === itemId)
+            if (node) {
+                this.beginTopologyInlineEdit('node', itemId, node.label || node.id)
+            }
+        } else {
+            const shape = this.topologyData.shapes.find(x => x.id === itemId)
+            if (shape) {
+                this.beginTopologyInlineEdit('shape', itemId, shape.label || '')
+            }
+        }
+    }
+
+    duplicateFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        if (kind === 'node') {
+            const node = this.topologyData.nodes.find(x => x.id === itemId)
+            if (node) {
+                const newNode = {
+                    ...JSON.parse(JSON.stringify(node)),
+                    id: this.createUniqueTopologyNodeId(node.type || 'node'),
+                    x: node.x + 30,
+                    y: node.y + 30,
+                }
+                this.topologyData.nodes.push(newNode)
+                this.persistTopologyToDoc()
+                this.setTopologySingleSelection('node', newNode.id)
+            }
+        } else {
+            const shape = this.topologyData.shapes.find(x => x.id === itemId)
+            if (shape) {
+                const newShape = {
+                    ...JSON.parse(JSON.stringify(shape)),
+                    id: this.createUniqueTopologyShapeId(),
+                    x: shape.x + 30,
+                    y: shape.y + 30,
+                }
+                this.topologyData.shapes.push(newShape)
+                this.persistTopologyToDoc()
+                this.setTopologySingleSelection('shape', newShape.id)
+            }
+        }
+        this.cdr.markForCheck()
+    }
+
+    deleteFromNodeContextMenu (): void {
+        const itemId = this.topologyNodeContextMenuNodeId
+        const kind = this.topologyNodeContextMenuKind
+        this.closeNodeContextMenu()
+        if (!itemId || !this.topologyData) {
+            return
+        }
+        this.setTopologySingleSelection(kind, itemId)
+        this.removeSelectedTopologyItem()
         this.cdr.markForCheck()
     }
 
@@ -5184,8 +5467,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                     labels: [],
                     color: this.getTopologyDefaultLinkColor(),
                     directed: this.topologyNewLinksDirected,
-                    bidirectional: false,
+                    bidirectional: this.topologyNewLinksBidirectional,
                 })
+                this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
             this.topologyPendingLinkSourceId = '__pending__'
@@ -5241,8 +5525,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                     labels: [],
                     color: this.getTopologyDefaultLinkColor(),
                     directed: this.topologyNewLinksDirected,
-                    bidirectional: false,
+                    bidirectional: this.topologyNewLinksBidirectional,
                 })
+                this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
             this.topologyPendingLinkSourceId = '__pending__'
@@ -6295,11 +6580,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             viewport.minY + 8,
             Math.min(viewport.maxY - size.height - 8, point.y - this.topologyDragOffsetY),
         )
-        if (nextX === node.x && nextY === node.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === node.x && snappedY === node.y) {
             return false
         }
-        node.x = nextX
-        node.y = nextY
+        node.x = snappedX
+        node.y = snappedY
         this.topologyDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -6355,11 +6642,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const nextY = item.sticky
             ? point.y - this.topologyTextDragOffsetY
             : Math.max(viewport.minY + 8, Math.min(viewport.maxY - 24, point.y - this.topologyTextDragOffsetY))
-        if (nextX === item.x && nextY === item.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === item.x && snappedY === item.y) {
             return false
         }
-        item.x = nextX
-        item.y = nextY
+        item.x = snappedX
+        item.y = snappedY
         this.topologyTextDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -6409,11 +6698,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const viewport = this.getTopologyViewportWorldBounds()
         const nextX = Math.max(viewport.minX + 8, Math.min(viewport.maxX - shape.width - 8, point.x - this.topologyShapeDragOffsetX))
         const nextY = Math.max(viewport.minY + 8, Math.min(viewport.maxY - shape.height - 8, point.y - this.topologyShapeDragOffsetY))
-        if (nextX === shape.x && nextY === shape.y) {
+        const snappedX = this.topologySnapToGrid ? this.snapToGrid(nextX) : nextX
+        const snappedY = this.topologySnapToGrid ? this.snapToGrid(nextY) : nextY
+        if (snappedX === shape.x && snappedY === shape.y) {
             return false
         }
-        shape.x = nextX
-        shape.y = nextY
+        shape.x = snappedX
+        shape.y = snappedY
         this.topologyShapeDragChanged = true
         this.scheduleTopologyRender()
         return true
@@ -7997,6 +8288,88 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }, delay)
     }
 
+    startGitStatusRefresh (): void {
+        if (this.gitStatusTimer) {
+            return
+        }
+        void this.refreshGitStatus()
+        this.gitStatusTimer = window.setInterval(() => {
+            void this.refreshGitStatus()
+        }, this.gitStatusRefreshMs)
+    }
+
+    stopGitStatusRefresh (): void {
+        if (this.gitStatusTimer) {
+            clearInterval(this.gitStatusTimer)
+            this.gitStatusTimer = undefined
+        }
+    }
+
+    private async refreshGitStatus (): Promise<void> {
+        const folders = Array.from(this.expandedFolders).concat(
+            this.documents.filter(d => d.path).map(d => path.dirname(d.path!)),
+        )
+        const roots = new Set<string>()
+        for (const folder of folders) {
+            if (folder) {
+                roots.add(folder)
+            }
+        }
+        if (!roots.size) {
+            if (this.gitFileStatuses.size) {
+                this.gitFileStatuses.clear()
+                this.cdr.markForCheck()
+            }
+            return
+        }
+        try {
+            const ipcRenderer = (window as any).require?.('electron')?.ipcRenderer
+            if (!ipcRenderer) {
+                return
+            }
+            const nextStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
+            const checkedRoots = new Set<string>()
+            for (const folder of roots) {
+                if (checkedRoots.has(folder)) {
+                    continue
+                }
+                checkedRoots.add(folder)
+                const result = await ipcRenderer.invoke('terminal-context:get-git-status', folder)
+                if (!result) {
+                    continue
+                }
+                // Find git root for resolving relative paths
+                let gitRoot = folder
+                try {
+                    const { execSync } = (window as any).require('child_process')
+                    gitRoot = execSync('git rev-parse --show-toplevel', { cwd: folder, encoding: 'utf8' }).trim()
+                } catch {
+                    // Use folder as fallback
+                }
+                for (const file of (result.staged || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'staged')
+                }
+                for (const file of (result.modified || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'modified')
+                }
+                for (const file of (result.untracked || [])) {
+                    nextStatuses.set(path.resolve(gitRoot, file), 'untracked')
+                }
+            }
+            this.gitFileStatuses = nextStatuses
+            this.cdr.markForCheck()
+        } catch {
+            // Git not available
+        }
+    }
+
+    getGitStatus (filePath: string | null): string | null {
+        if (!filePath) {
+            return null
+        }
+        return this.gitFileStatuses.get(filePath) ?? null
+    }
+
     private async rebuildTreeItems (buildNonce: number): Promise<void> {
         const { roots, truncated } = await this.buildTree(buildNonce)
         if (buildNonce !== this.treeBuildNonce) {
@@ -8184,11 +8557,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         window.setTimeout(() => {
             this.updateTreeItems()
             this.updateVisibleTreeItems(true)
+            this.startGitStatusRefresh()
             this.cdr.markForCheck()
         }, 0)
     }
 
     ngOnDestroy (): void {
+        this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
             clearTimeout(this.persistFoldersTimer)
@@ -10435,13 +10810,32 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.viewMode = 'editor'
         this.statusMessage = ''
         if (this.splitEditor && this.focusedEditor === 'split') {
+            // Save outgoing view state
+            if (this.splitDocId) {
+                const vs = this.splitEditor.saveViewState?.()
+                if (vs) {
+                    this.editorViewStates.set(this.splitDocId, vs)
+                }
+            }
             this.splitDocId = docId
             this.splitEditor.setModel(doc.model)
+            // Restore incoming view state
+            const savedVs = this.editorViewStates.get(docId)
+            if (savedVs) {
+                this.splitEditor.restoreViewState?.(savedVs)
+            }
             this.setModelLanguage(doc)
             this.updateStatus()
             this.syncTopologyForActiveDoc()
             this.persistState()
             return
+        }
+        // Save outgoing view state
+        if (this.activeDocId && this.primaryEditor) {
+            const vs = this.primaryEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.activeDocId, vs)
+            }
         }
         this.activeDocId = docId
         this.refreshActiveDocCache()
@@ -10449,6 +10843,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.pendingDiffDocId = null
         }
         this.primaryEditor?.setModel(doc.model)
+        // Restore incoming view state
+        const savedVs = this.editorViewStates.get(docId)
+        if (savedVs && this.primaryEditor) {
+            this.primaryEditor.restoreViewState?.(savedVs)
+        }
         if (!this.splitDocId) {
             this.splitEditor?.setModel(doc.model)
         }
@@ -10619,8 +11018,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             lineNumbers: 'on',
             lineNumbersMinChars: 3,
             lineDecorationsWidth: 16,
-            glyphMargin: false,
+            glyphMargin: true,
             selectOnLineNumbers: true,
+            renderLineHighlight: 'all',
+            renderLineHighlightOnlyWhenFocus: false,
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
             columnSelection: true,
@@ -10652,10 +11053,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         model.setEOL(snapshot.eol === 'CRLF' ? this.monaco.editor.EndOfLineSequence.CRLF : this.monaco.editor.EndOfLineSequence.LF)
         model.updateOptions({ tabSize: snapshot.tabSize, insertSpaces: snapshot.insertSpaces })
         const folderPath = snapshot.folderPath ?? (snapshot.path ? path.dirname(snapshot.path) : null)
+        const docId = `${Date.now()}-${Math.random().toString(16).slice(2)}`
         const doc: EditorDocument = {
             ...snapshot,
             folderPath,
-            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            id: docId,
             model,
             modelDisposables: [],
             isDirty: snapshot.isDirty ?? false,
@@ -10664,6 +11066,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             diskMtimeMs: null,
             diskSize: null,
             externalConflict: null,
+        }
+        // Restore saved view state (cursor/scroll position) if available
+        if (snapshot.viewState) {
+            this.editorViewStates.set(docId, snapshot.viewState)
         }
         // Track listener subscriptions for explicit disposal to prevent leaks.
         // Guard callbacks: if the model fires during disposal, bail out.
@@ -10820,13 +11226,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return 'plaintext'
     }
 
+    private isUntitledName (name: string): boolean {
+        return /^Untitled-\d+$/i.test(name)
+    }
+
     private async saveDocument (doc: EditorDocument): Promise<boolean> {
         if (!this.isModelAlive(doc)) { return false }
         const content = doc.model.getValue()
         const data = new TextEncoder().encode(content)
 
         const initialPath = doc.path
-        if (initialPath) {
+        if (initialPath && !this.isUntitledName(doc.name)) {
             if (this.isPathHiddenInTree(initialPath)) {
                 return false
             }
@@ -10876,6 +11286,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             doc.lastSavedValue = content
             const newPath = (download as any).filePath ?? null
             if (newPath) {
+                // Clean up old untitled file if saving to a new location.
+                const oldPath = initialPath
+                if (oldPath && !this.isSameFsPath(oldPath, newPath)) {
+                    try { fsSync.unlinkSync(oldPath) } catch { /* already gone */ }
+                    this.hideTreePath(oldPath)
+                }
                 doc.path = newPath
                 doc.name = path.basename(newPath)
                 doc.folderPath = this.getFolderForPath(newPath) ?? doc.folderPath
@@ -10889,6 +11305,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
             this.updateTitle(doc)
             this.syncOpenedFileScopes()
+            this.updateTreeItems()
             this.persistState()
             return true
         } catch (err: any) {
@@ -10921,6 +11338,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             insertSpaces: doc.insertSpaces,
             isDirty: doc.isDirty,
             lastSavedValue: doc.lastSavedValue,
+            viewState: this.editorViewStates.get(doc.id) ?? null,
         }
     }
 
@@ -12232,6 +12650,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private persistState (): void {
+        // Save current editor view states before snapshotting
+        if (this.activeDocId && this.primaryEditor) {
+            const vs = this.primaryEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.activeDocId, vs)
+            }
+        }
+        if (this.splitDocId && this.splitEditor) {
+            const vs = this.splitEditor.saveViewState?.()
+            if (vs) {
+                this.editorViewStates.set(this.splitDocId, vs)
+            }
+        }
         this.syncOpenedFileScopes()
         // Flush any pending debounced folder write so that
         // the full state snapshot is consistent.

@@ -103,6 +103,7 @@
                                 code.value {{item.value}}
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleSplitView()', [class.active]='!!splitEditor', [disabled]='viewMode==="diff"') Split
             button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleAutosave()', [class.active]='autosaveEnabled') Autosave
+            button.btn.btn-sm.btn-outline-secondary.toolbar-toggle(type='button', (click)='toggleWordWrap()', [class.active]='wordWrapEnabled') Wrap
             .toolbar-separator
             .menu-container
                 button.btn.btn-sm.btn-outline-secondary.indent-toggle(type='button', (click)='toggleIndentMenu($event)', [class.active]='showIndentMenu')
