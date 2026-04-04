@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater'
 import { Subject, Observable, debounceTime } from 'rxjs'
 import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen, BrowserWindowConstructorOptions, TouchBar, nativeImage, WebContents, nativeTheme } from 'electron'
 import * as fs from 'fs'
+import * as path from 'path'
 
 class SimpleJsonStore {
     private data: Record<string, any> = {}
@@ -32,7 +33,6 @@ class SimpleJsonStore {
 }
 import { enable as enableRemote } from '@electron/remote/main'
 import * as os from 'os'
-import * as path from 'path'
 import macOSRelease from 'macos-release'
 import { compare as compareVersions } from 'compare-versions'
 

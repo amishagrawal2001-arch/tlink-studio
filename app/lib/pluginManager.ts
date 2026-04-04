@@ -4,7 +4,7 @@ import { promisify } from 'util'
 const execFileAsync = promisify(execFile)
 
 export class PluginManager {
-    private buildEnv (): NodeJS.ProcessEnv {
+    private buildEnv (): Record<string, string | undefined> {
         const env = { ...process.env }
         const registry = process.env.TLINK_NPM_REGISTRY ?? process.env.NPM_CONFIG_REGISTRY
         if (registry) {
