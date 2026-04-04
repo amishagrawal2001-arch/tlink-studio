@@ -13,7 +13,6 @@ import * as url from 'node:url'
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const appPath = path.join(repoRoot, 'app')
-const keytarBinaryPath = path.join(appPath, 'node_modules', 'keytar', 'build', 'Release', 'keytar.node')
 const ptyBinaryPath = path.join(appPath, 'node_modules', 'node-pty', 'build', 'Release', 'pty.node')
 const ptySpawnHelperPath = path.join(appPath, 'node_modules', 'node-pty', 'build', 'Release', 'spawn-helper')
 
@@ -52,18 +51,6 @@ function detectBinaryArchitectures (filePath) {
     }
 }
 
-function keytarBinaryMatchesTargetArch (targetArch) {
-    if (!fs.existsSync(keytarBinaryPath)) {
-        return false
-    }
-    const expectedArch = normalizeMacArch(targetArch)
-    const arches = detectBinaryArchitectures(keytarBinaryPath)
-    if (!arches.size) {
-        return true
-    }
-    return arches.has(expectedArch)
-}
-
 function ptyBinaryMatchesTargetArch (targetArch) {
     if (!fs.existsSync(ptyBinaryPath)) {
         return false
@@ -74,30 +61,6 @@ function ptyBinaryMatchesTargetArch (targetArch) {
         return true
     }
     return arches.has(expectedArch)
-}
-
-async function ensureKeytarBinary (targetArch) {
-    if (keytarBinaryMatchesTargetArch(targetArch)) {
-        return
-    }
-
-    console.log(`Ensuring keytar native module for arch=${targetArch}`)
-    await rebuild({
-        buildPath: appPath,
-        electronVersion: vars.electronVersion,
-        arch: targetArch,
-        force: true,
-        useCache: false,
-        onlyModules: ['keytar'],
-    })
-
-    if (!fs.existsSync(keytarBinaryPath)) {
-        throw new Error(`Missing keytar native module after rebuild: ${keytarBinaryPath}`)
-    }
-    if (!keytarBinaryMatchesTargetArch(targetArch)) {
-        const detected = [...detectBinaryArchitectures(keytarBinaryPath)].join(', ') || 'unknown'
-        throw new Error(`keytar native module arch mismatch: expected ${normalizeMacArch(targetArch)}, got ${detected}`)
-    }
 }
 
 async function ensurePtyBinary (targetArch) {
@@ -154,7 +117,6 @@ const requestedMacArtifacts = (process.env.TLINK_MAC_ARTIFACTS || '')
 const macTargets = requestedMacArtifacts.length ? requestedMacArtifacts : ['dmg', 'zip']
 
 ;(async () => {
-    await ensureKeytarBinary(process.env.ARCH)
     await ensurePtyBinary(process.env.ARCH)
 
     await builder({

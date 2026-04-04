@@ -57,10 +57,8 @@ function validateBundledStudioAssets (appPath) {
 
 function validateBundledNativeModules (appPath) {
     const resourcesPath = path.join(appPath, 'Contents', 'Resources')
-    const keytarNodePath = path.join(resourcesPath, 'node_modules', 'keytar', 'build', 'Release', 'keytar.node')
     const ptyNodePath = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'node-pty', 'build', 'Release', 'pty.node')
     const spawnHelperPath = path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'node-pty', 'build', 'Release', 'spawn-helper')
-    assertFileExists(keytarNodePath, 'keytar native module')
     assertFileExists(ptyNodePath, 'node-pty native module')
     assertFileExists(spawnHelperPath, 'node-pty spawn-helper')
 }
