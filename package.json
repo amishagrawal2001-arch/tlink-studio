@@ -142,7 +142,7 @@
   "private": true,
   "dependencies": {
     "@luminati-io/socksv5": "^0.0.7",
-    "dotenv": "^16.3.1",
+    "dotenv": "^17.4.0",
     "node-rdpjs": "^0.3.0"
   }
 }
