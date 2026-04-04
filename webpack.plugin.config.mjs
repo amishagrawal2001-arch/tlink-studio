@@ -45,13 +45,13 @@ export default options => {
         output: {
             path: path.resolve(options.dirname, 'dist'),
             filename: 'index.js',
-            pathinfo: true,
+            pathinfo: isDev,
             libraryTarget: 'umd',
             publicPath: '',
         },
         mode: isDev ? 'development' : 'production',
         optimization:{
-            minimize: false,
+            minimize: !isDev,
         },
         cache: !isDev ? false : {
             type: 'filesystem',
@@ -153,7 +153,7 @@ export default options => {
             'electron',
             'fontmanager-redux',
             'fs',
-            'keytar',
+
             'macos-native-processlist',
             'native-process-working-directory',
             'net',

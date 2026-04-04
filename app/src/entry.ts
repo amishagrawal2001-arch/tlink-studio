@@ -5,7 +5,7 @@
 (window as any).__zone_symbol__UNPATCHED_EVENTS = ['mousemove', 'mouseup', 'scroll', 'wheel', 'resize', 'pointermove', 'pointerup']
 
 import 'zone.js'
-import 'core-js/proposals/reflect-metadata'
+import 'reflect-metadata'
 import 'rxjs'
 
 import './global.scss'

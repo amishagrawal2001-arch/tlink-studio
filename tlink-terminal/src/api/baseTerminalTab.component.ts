@@ -49,8 +49,8 @@ const ANSI_SEQUENCE_REGEX = /(?:\x1b\[[0-?]*[ -/]*[@-~])|(?:\x1b\][^\x07\x1b]*(?
  */
 @Component({ template: '' })
 export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends BaseTabComponentRuntime implements OnInit, OnDestroy {
-    static template: string = require<string>('../components/baseTerminalTab.component.pug')
-    static styles: string[] = [require<string>('../components/baseTerminalTab.component.scss')]
+    static template: string = require('../components/baseTerminalTab.component.pug')
+    static styles: string[] = [require('../components/baseTerminalTab.component.scss')]
     static animations: AnimationTriggerMetadata[] = [
         trigger('toolbarSlide', [
             transition(':enter', [
@@ -376,7 +376,7 @@ export class BaseTerminalTabComponent<P extends BaseTerminalProfile> extends Bas
         })
 
         this.bellPlayer = document.createElement('audio')
-        this.bellPlayer.src = require<string>('../bell.ogg')
+        this.bellPlayer.src = require('../bell.ogg')
         this.bellPlayer.load()
 
         this.contextMenuProviders.sort((a, b) => a.weight - b.weight)

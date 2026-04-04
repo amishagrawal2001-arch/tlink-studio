@@ -123,7 +123,6 @@ const { ensureBundledOllama } = require('./ollama')
 
 const { parseArgs } = require('./cli')
 const { Application } = require('./app')
-const electronDebug = require('electron-debug')
 const { loadConfig } = require('./config')
 
 const argv = parseArgs(process.argv, process.cwd())
@@ -228,7 +227,7 @@ process.on('uncaughtException' as any, err => {
 })
 
 if (argv.d) {
-    electronDebug({
+    require('electron-debug')({
         isEnabled: true,
         showDevTools: true,
         devToolsMode: 'undocked',

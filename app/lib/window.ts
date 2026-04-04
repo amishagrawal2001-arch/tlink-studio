@@ -2,7 +2,34 @@ import * as glasstron from 'glasstron'
 import { autoUpdater } from 'electron-updater'
 import { Subject, Observable, debounceTime } from 'rxjs'
 import { BrowserWindow, app, ipcMain, Rectangle, Menu, screen, BrowserWindowConstructorOptions, TouchBar, nativeImage, WebContents, nativeTheme } from 'electron'
-const ElectronConfig: any = require('electron-config')
+import * as fs from 'fs'
+
+class SimpleJsonStore {
+    private data: Record<string, any> = {}
+    private filePath: string
+
+    constructor (opts: { name: string }) {
+        this.filePath = path.join(app.getPath('userData'), `${opts.name}.json`)
+        try {
+            this.data = JSON.parse(fs.readFileSync(this.filePath, 'utf8'))
+        } catch {
+            this.data = {}
+        }
+    }
+
+    get (key: string): any {
+        return this.data[key]
+    }
+
+    set (key: string, value: any): void {
+        this.data[key] = value
+        try {
+            fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2))
+        } catch {
+            // best effort
+        }
+    }
+}
 import { enable as enableRemote } from '@electron/remote/main'
 import * as os from 'os'
 import * as path from 'path'
@@ -60,7 +87,7 @@ export class Window {
         options = options ?? {}
         this.windowRole = options.windowRole ?? 'default'
 
-        this.windowConfig = new ElectronConfig({ name: 'window' })
+        this.windowConfig = new SimpleJsonStore({ name: 'window' })
         this.windowBounds = this.windowConfig.get('windowBoundaries')
 
         // Track if this window has a custom size (should not save bounds)

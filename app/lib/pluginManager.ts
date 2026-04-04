@@ -1,56 +1,39 @@
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 
+const execFileAsync = promisify(execFile)
 
 export class PluginManager {
-    npm: any
-    npmReady?: Promise<void>
-
-    private configureNpm (npm: any): void {
+    private buildEnv (): NodeJS.ProcessEnv {
+        const env = { ...process.env }
         const registry = process.env.TLINK_NPM_REGISTRY ?? process.env.NPM_CONFIG_REGISTRY
         if (registry) {
-            npm.config.set('registry', registry)
+            env.npm_config_registry = registry
         }
         const cafile = process.env.TLINK_NPM_CAFILE ?? process.env.NODE_EXTRA_CA_CERTS
         if (cafile) {
-            npm.config.set('cafile', cafile)
+            env.npm_config_cafile = cafile
         }
         const strictSSL = process.env.TLINK_NPM_STRICT_SSL ?? process.env.NPM_CONFIG_STRICT_SSL
         if (strictSSL !== undefined) {
             const enabled = ['1', 'true', 'yes'].includes(String(strictSSL).toLowerCase())
-            npm.config.set('strict-ssl', enabled)
+            env.npm_config_strict_ssl = String(enabled)
         }
-    }
-
-    async ensureLoaded (): Promise<void> {
-        if (!this.npmReady) {
-            this.npmReady = new Promise((resolve, reject) => {
-                const npm = require('npm')
-                npm.load(err => {
-                    if (err) {
-                        console.error(err)
-                        reject(err instanceof Error ? err : new Error(String(err)))
-                        return
-                    }
-                    npm.config.set('global', false)
-                    this.configureNpm(npm)
-                    this.npm = npm
-                    resolve()
-                })
-            })
-        }
-        return this.npmReady
+        return env
     }
 
     async install (path: string, name: string, version: string): Promise<void> {
-        await this.ensureLoaded()
-        this.npm.prefix = path
-        return promisify(this.npm.commands.install)([`${name}@${version}`])
+        await execFileAsync('npm', ['install', '--no-save', `${name}@${version}`], {
+            cwd: path,
+            env: this.buildEnv(),
+        })
     }
 
     async uninstall (path: string, name: string): Promise<void> {
-        await this.ensureLoaded()
-        this.npm.prefix = path
-        return promisify(this.npm.commands.remove)([name])
+        await execFileAsync('npm', ['uninstall', name], {
+            cwd: path,
+            env: this.buildEnv(),
+        })
     }
 }
 

@@ -45,7 +45,7 @@ export default () => ({
     },
     mode: process.env.TLINK_DEV ? 'development' : 'production',
     optimization:{
-        minimize: false,
+        minimize: !process.env.TLINK_DEV,
     },
     context: __dirname,
     devtool: process.env.TLINK_DEV ? 'eval-cheap-module-source-map' : 'source-map',
@@ -88,7 +88,7 @@ export default () => ({
                 type: 'asset/resource',
             },
             { test: /\.scss$/, use: ['style-loader', 'css-loader', 'sass-loader'] },
-            { test: /\.css$/, use: ['style-loader', 'css-loader', 'sass-loader'] },
+            { test: /\.css$/, use: ['style-loader', 'css-loader'] },
             {
                 test: /\.(png|svg|ttf|eot|otf|woff|woff2)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
                 type: 'asset',
