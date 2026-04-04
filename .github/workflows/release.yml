@@ -1,21 +1,13 @@
 ---
+# Release creation is now handled by the Upload-Release job in build.yml.
+# This workflow is kept as a no-op placeholder to avoid breaking references.
 name: "tagged-release"
 
 on:
-  push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
-  tagged-release:
-    name: "Tagged Release"
-    runs-on: "ubuntu-latest"
-
+  noop:
+    runs-on: ubuntu-latest
     steps:
-      - uses: "softprops/action-gh-release@v2"
-        with:
-          draft: true
-          generate_release_notes: true
+      - run: echo "Release is created by the Package-Build workflow."
