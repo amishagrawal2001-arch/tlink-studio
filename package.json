@@ -70,7 +70,7 @@
     "json-loader": "^0.5.7",
     "lru-cache": "^6.0.0",
     "macos-release": "^3.3.0",
-    "marked": "^17.0.1",
+    "marked": "^17.0.5",
     "minimatch": "5.1.6",
     "mixpanel": "^0.20.0",
     "monaco-editor": "0.45.0",
