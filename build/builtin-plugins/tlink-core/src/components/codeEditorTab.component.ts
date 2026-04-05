@@ -10525,6 +10525,25 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    async formatAsYAML (): Promise<void> {
+        if (!(await this.ensureEditor())) {
+            return
+        }
+        const doc = this.getActiveDoc()
+        if (!doc) {
+            return
+        }
+        try {
+            const yaml = require('js-yaml')
+            const content = doc.model.getValue() || ''
+            const parsed = yaml.load(content)
+            const pretty = yaml.dump(parsed, { indent: 2, lineWidth: 120, noRefs: true })
+            doc.model.setValue(pretty)
+        } catch (err: any) {
+            this.setError(`Invalid YAML: ${err?.message ?? err}`)
+        }
+    }
+
     toggleDiagnostics (event?: MouseEvent): void {
         event?.preventDefault()
         event?.stopPropagation()
@@ -10921,6 +10940,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             break
         case 'formatJson':
             await this.formatAsJSON()
+            break
+        case 'formatYaml':
+            await this.formatAsYAML()
             break
         case 'uppercase':
             await this.transformSelectedText('Uppercased selection', value => value.toUpperCase())
