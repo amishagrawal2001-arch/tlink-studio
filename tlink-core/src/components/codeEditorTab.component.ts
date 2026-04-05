@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, HostBinding, HostListener, Injector, ViewChild, Optional } from '@angular/core'
+import { AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostBinding, HostListener, Injector, NgZone, ViewChild, Optional } from '@angular/core'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as path from 'path'
@@ -213,6 +213,7 @@ interface TopologyColorOption {
     selector: 'code-editor-tab',
     templateUrl: './codeEditorTab.component.pug',
     styleUrls: ['./codeEditorTab.component.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CodeEditorTabComponent extends BaseTabComponent implements AfterViewInit {
     private static globalMonacoPromise?: Promise<Monaco>
@@ -324,6 +325,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private markerDisposable: any = null
     topologyCanvasMode = false
     topologyData: TopologyDocumentModel|null = null
+    private topologyNodeMap = new Map<string, any>()
+    private topologyTextMap = new Map<string, any>()
+    private topologyShapeMap = new Map<string, any>()
     topologyParseError = ''
     topologySelectedNodeId: string|null = null
     topologySelectedLinkId: string|null = null
@@ -3610,6 +3614,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         private tabsService: TabsService,
         @Optional() private ngbModal: NgbModal,
         private cdr: ChangeDetectorRef,
+        private zone: NgZone,
     ) {
         super(injector)
         this.setTitle(this.studioTitle)
@@ -3830,8 +3835,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return points.length > 1
     }
 
-    get topologyCanvasTransform (): string {
-        return `translate(${this.topologyPanX}px, ${this.topologyPanY}px) scale(${this.topologyZoom})`
+    cachedTopologyCanvasTransform = 'translate(0px, 0px) scale(1)'
+
+    private updateTopologyCanvasTransform (): void {
+        this.cachedTopologyCanvasTransform = `translate(${this.topologyPanX}px, ${this.topologyPanY}px) scale(${this.topologyZoom})`
     }
 
     get topologyZoomLabel (): string {
@@ -4781,6 +4788,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyZoom = 1
         this.topologyPanX = 0
         this.topologyPanY = 0
+        this.updateTopologyCanvasTransform()
         this.cdr.markForCheck()
     }
 
@@ -5027,6 +5035,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyZoom = Math.max(0.35, Math.min(2.5, Math.min(zoomX, zoomY)))
         this.topologyPanX = Math.round((canvasWidth - width * this.topologyZoom) / 2 - minX * this.topologyZoom)
         this.topologyPanY = Math.round((canvasHeight - height * this.topologyZoom) / 2 - minY * this.topologyZoom)
+        this.updateTopologyCanvasTransform()
         this.cdr.markForCheck()
     }
 
@@ -6572,7 +6581,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!point) {
             return false
         }
-        const node = this.topologyData.nodes.find(x => x.id === this.topologyDragNodeId)
+        const node = this.topologyNodeMap.get(this.topologyDragNodeId)
         if (!node) {
             return false
         }
@@ -6602,7 +6611,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!this.topologyData || !this.topologyResizeNodeId) {
             return false
         }
-        const node = this.topologyData.nodes.find(x => x.id === this.topologyResizeNodeId)
+        const node = this.topologyNodeMap.get(this.topologyResizeNodeId)
         if (!node) {
             return false
         }
@@ -6637,7 +6646,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!point) {
             return false
         }
-        const item = this.topologyData.texts.find(x => x.id === this.topologyDragTextId)
+        const item = this.topologyTextMap.get(this.topologyDragTextId)
         if (!item) {
             return false
         }
@@ -6697,7 +6706,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!point) {
             return false
         }
-        const shape = this.topologyData.shapes.find(x => x.id === this.topologyDragShapeId)
+        const shape = this.topologyShapeMap.get(this.topologyDragShapeId)
         if (!shape) {
             return false
         }
@@ -6832,18 +6841,37 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyPointerSpaceCache = null
     }
 
+    private rebuildTopologyLookupMaps (): void {
+        this.topologyNodeMap.clear()
+        this.topologyTextMap.clear()
+        this.topologyShapeMap.clear()
+        if (!this.topologyData) {
+            return
+        }
+        for (const n of this.topologyData.nodes) {
+            this.topologyNodeMap.set(n.id, n)
+        }
+        for (const t of this.topologyData.texts ?? []) {
+            this.topologyTextMap.set(t.id, t)
+        }
+        for (const s of this.topologyData.shapes ?? []) {
+            this.topologyShapeMap.set(s.id, s)
+        }
+    }
+
     private invalidateTopologyLinkRenderItems (): void {
         this.topologyLinkRenderItemsDirty = true
     }
 
     private scheduleTopologyRender (): void {
         this.invalidateTopologyLinkRenderItems()
+        this.updateTopologyCanvasTransform()
         if (this.topologyRenderRaf != null) {
             return
         }
         this.topologyRenderRaf = window.requestAnimationFrame(() => {
             this.topologyRenderRaf = undefined
-            this.cdr.markForCheck()
+            this.cdr.detectChanges()
         })
     }
 
@@ -7020,6 +7048,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         try {
             const parsed = JSON.parse(serialized)
             this.topologyData = this.normalizeTopologyData(parsed, doc.name || 'topology.json')
+            this.rebuildTopologyLookupMaps()
             this.clearTopologySelection()
             this.topologyPendingLinkSourceId = null
             this.topologyPendingLinkSourceKind = null
@@ -7942,6 +7971,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private loadTopologyFromDoc (doc: EditorDocument): void {
         if (!this.isModelAlive(doc)) {
             this.topologyData = null
+            this.rebuildTopologyLookupMaps()
             this.topologyParseError = 'Document model is unavailable'
             this.clearTopologySelection()
             this.topologyPendingLinkSourceId = null
@@ -7964,6 +7994,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 ? JSON.parse(rawContent)
                 : { type: 'tlink-topology', nodes: [], links: [], shapes: [], texts: [] }
             this.topologyData = this.normalizeTopologyData(parsed, doc.name || 'topology.json')
+            this.rebuildTopologyLookupMaps()
             this.invalidateTopologyLinkRenderItems()
             this.applyTopologyViewSettingsFromMetadata()
             this.topologyParseError = ''
@@ -7986,6 +8017,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.captureTopologyRestorePoint(doc.id, serialized, true)
         } catch (err: any) {
             this.topologyData = null
+            this.rebuildTopologyLookupMaps()
             this.invalidateTopologyLinkRenderItems()
             this.clearTopologySelection()
             this.topologyPendingLinkSourceId = null
@@ -8012,6 +8044,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!doc || !this.isTopologyDocCandidate(doc)) {
             this.topologyCanvasMode = false
             this.topologyData = null
+            this.rebuildTopologyLookupMaps()
             this.invalidateTopologyLinkRenderItems()
             this.topologyParseError = ''
             this.clearTopologySelection()
@@ -8117,6 +8150,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         try {
             doc.model.setValue(serialized)
             this.topologyData = next
+            this.rebuildTopologyLookupMaps()
             this.invalidateTopologyLinkRenderItems()
             this.topologyParseError = ''
         } finally {
@@ -8555,8 +8589,21 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    private boundOnMousemove = (e: MouseEvent) => this.onSidebarDrag(e)
+    private boundOnMouseup = () => this.endSidebarDrag()
+    private boundOnResize = () => this.onWindowResize()
+
     async ngAfterViewInit (): Promise<void> {
         await this.initializeEditor()
+
+        // Register high-frequency event listeners outside Angular zone
+        // to avoid triggering change detection on every event.
+        this.zone.runOutsideAngular(() => {
+            document.addEventListener('mousemove', this.boundOnMousemove)
+            document.addEventListener('mouseup', this.boundOnMouseup)
+            window.addEventListener('resize', this.boundOnResize)
+        })
+
         // Update tree items after initialization to avoid ExpressionChangedAfterItHasBeenCheckedError
         // Use setTimeout to defer to next tick, after change detection completes
         window.setTimeout(() => {
@@ -8568,6 +8615,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     ngOnDestroy (): void {
+        document.removeEventListener('mousemove', this.boundOnMousemove)
+        document.removeEventListener('mouseup', this.boundOnMouseup)
+        window.removeEventListener('resize', this.boundOnResize)
         this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
@@ -13537,7 +13587,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyNodeContextMenuNodeId = null
     }
 
-    @HostListener('document:mousemove', ['$event'])
     onSidebarDrag (event: MouseEvent): void {
         if (!this.topologyPanDragActive && !this.topologyFreeLinkCreating && !this.topologyMarqueeActive && !this.topologyResizeNodeId && !this.topologyDragNodeId && !this.topologyDragFreeLinkId && !this.topologyResizeTextId && !this.topologyDragTextId && !this.topologyResizeShapeId && !this.topologyDragShapeId && !this.resizingSidebar) {
             return
@@ -13549,6 +13598,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         requestAnimationFrame(() => {
             this.mousemoveRafPending = false
             this.handleMousemove(event)
+            this.cdr.detectChanges()
         })
     }
 
@@ -13604,89 +13654,93 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
-    @HostListener('document:mouseup')
     endSidebarDrag (): void {
-        if (this.topologyPanDragActive) {
-            this.finishTopologyPanDrag()
-        }
-        if (this.topologyFreeLinkCreating) {
-            this.finishTopologyFreeLinkDraft()
-        }
-        if (this.topologyMarqueeActive) {
-            this.finishTopologyMarquee()
-        }
-        if (this.topologyResizeNodeId) {
-            this.topologyResizeNodeId = null
-            if (this.topologyNodeResizeChanged) {
-                this.topologyNodeResizeChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyDragNodeId) {
-            this.topologyDragNodeId = null
-            if (this.topologyDragChanged) {
-                this.topologyDragChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyDragFreeLinkId) {
-            this.topologyDragFreeLinkId = null
-            this.topologyDragFreeLinkHandle = null
-            this.topologyFreeLinkMoveStartPointerX = 0
-            this.topologyFreeLinkMoveStartPointerY = 0
-            this.topologyFreeLinkMoveStartX1 = 0
-            this.topologyFreeLinkMoveStartY1 = 0
-            this.topologyFreeLinkMoveStartX2 = 0
-            this.topologyFreeLinkMoveStartY2 = 0
-            if (this.topologyFreeLinkHandleDragChanged) {
-                this.topologyFreeLinkHandleDragChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyDragTextId) {
-            this.topologyDragTextId = null
-            if (this.topologyTextDragChanged) {
-                this.topologyTextDragChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyResizeTextId) {
-            this.topologyResizeTextId = null
-            if (this.topologyTextResizeChanged) {
-                this.topologyTextResizeChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyResizeShapeId) {
-            this.topologyResizeShapeId = null
-            if (this.topologyShapeResizeChanged) {
-                this.topologyShapeResizeChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        if (this.topologyDragShapeId) {
-            this.topologyDragShapeId = null
-            if (this.topologyShapeDragChanged) {
-                this.topologyShapeDragChanged = false
-                this.persistTopologyToDoc()
-            }
-            this.cdr.markForCheck()
-        }
-        this.clearTopologyPointerSpaceCache()
-        if (!this.resizingSidebar) {
+        // Early exit if nothing is active — avoid entering zone unnecessarily.
+        if (!this.topologyPanDragActive && !this.topologyFreeLinkCreating && !this.topologyMarqueeActive && !this.topologyResizeNodeId && !this.topologyDragNodeId && !this.topologyDragFreeLinkId && !this.topologyDragTextId && !this.topologyResizeTextId && !this.topologyResizeShapeId && !this.topologyDragShapeId && !this.resizingSidebar) {
             return
         }
-        this.resizingSidebar = false
-        this.persistState()
+        this.zone.run(() => {
+            if (this.topologyPanDragActive) {
+                this.finishTopologyPanDrag()
+            }
+            if (this.topologyFreeLinkCreating) {
+                this.finishTopologyFreeLinkDraft()
+            }
+            if (this.topologyMarqueeActive) {
+                this.finishTopologyMarquee()
+            }
+            if (this.topologyResizeNodeId) {
+                this.topologyResizeNodeId = null
+                if (this.topologyNodeResizeChanged) {
+                    this.topologyNodeResizeChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyDragNodeId) {
+                this.topologyDragNodeId = null
+                if (this.topologyDragChanged) {
+                    this.topologyDragChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyDragFreeLinkId) {
+                this.topologyDragFreeLinkId = null
+                this.topologyDragFreeLinkHandle = null
+                this.topologyFreeLinkMoveStartPointerX = 0
+                this.topologyFreeLinkMoveStartPointerY = 0
+                this.topologyFreeLinkMoveStartX1 = 0
+                this.topologyFreeLinkMoveStartY1 = 0
+                this.topologyFreeLinkMoveStartX2 = 0
+                this.topologyFreeLinkMoveStartY2 = 0
+                if (this.topologyFreeLinkHandleDragChanged) {
+                    this.topologyFreeLinkHandleDragChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyDragTextId) {
+                this.topologyDragTextId = null
+                if (this.topologyTextDragChanged) {
+                    this.topologyTextDragChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyResizeTextId) {
+                this.topologyResizeTextId = null
+                if (this.topologyTextResizeChanged) {
+                    this.topologyTextResizeChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyResizeShapeId) {
+                this.topologyResizeShapeId = null
+                if (this.topologyShapeResizeChanged) {
+                    this.topologyShapeResizeChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            if (this.topologyDragShapeId) {
+                this.topologyDragShapeId = null
+                if (this.topologyShapeDragChanged) {
+                    this.topologyShapeDragChanged = false
+                    this.persistTopologyToDoc()
+                }
+                this.cdr.markForCheck()
+            }
+            this.clearTopologyPointerSpaceCache()
+            if (!this.resizingSidebar) {
+                return
+            }
+            this.resizingSidebar = false
+            this.persistState()
+        })
     }
 
-    @HostListener('window:resize')
     onWindowResize (): void {
         if (this.resizeRafPending) {
             return
@@ -13696,7 +13750,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.resizeRafPending = false
             this.layoutEditors()
             this.updateVisibleTreeItems(true)
-            this.cdr.markForCheck()
+            this.cdr.detectChanges()
         })
     }
 

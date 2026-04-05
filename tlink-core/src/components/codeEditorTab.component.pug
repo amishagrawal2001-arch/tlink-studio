@@ -607,7 +607,7 @@
                 .topology-error(*ngIf='topologyParseError') {{topologyParseError}}
                 .topology-workspace(*ngIf='!topologyParseError', [class.inspector-visible]='hasTopologySelection')
                     .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)', (wheel)='onTopologyCanvasWheel($event)')
-                        .topology-viewport([style.transform]='topologyCanvasTransform')
+                        .topology-viewport([style.transform]='cachedTopologyCanvasTransform')
                             svg.topology-links
                                 defs
                                     marker#topologyArrowhead(markerWidth='8', markerHeight='8', refX='7', refY='4', orient='auto-start-reverse')
