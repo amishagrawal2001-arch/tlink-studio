@@ -4598,8 +4598,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.loadTopologyFromDoc(doc)
             this.layoutEditors()
             this.cdr.markForCheck()
+            // Attach wheel listener outside zone after the canvas element renders.
+            window.setTimeout(() => {
+                this.attachTopologyWheelListener()
+            }, 0)
             return
         }
+        this.detachTopologyWheelListener()
         this.topologyCanvasMode = false
         this.topologyParseError = ''
         this.topologyPendingLinkSourceId = null
@@ -5039,28 +5044,59 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
+    private attachTopologyWheelListener (): void {
+        const el = this.topologyCanvas?.nativeElement
+        if (!el) {
+            return
+        }
+        this.zone.runOutsideAngular(() => {
+            el.addEventListener('wheel', this.boundOnWheel, { passive: false })
+        })
+    }
+
+    private detachTopologyWheelListener (): void {
+        const el = this.topologyCanvas?.nativeElement
+        if (el) {
+            el.removeEventListener('wheel', this.boundOnWheel)
+        }
+    }
+
     onTopologyCanvasWheel (event: WheelEvent): void {
         if (!this.topologyCanvas?.nativeElement) {
             return
         }
         event.preventDefault()
-        if (event.ctrlKey || event.metaKey) {
-            const scaleFactor = event.deltaY < 0 ? 1.08 : (1 / 1.08)
-            this.adjustTopologyZoom(scaleFactor, event.clientX, event.clientY)
+        if (this.wheelRafPending) {
             return
         }
-        const modeScale = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-            ? 18
-            : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
-        const deltaX = Number.isFinite(event.deltaX) ? event.deltaX * modeScale : 0
-        const deltaY = Number.isFinite(event.deltaY) ? event.deltaY * modeScale : 0
-        if (Math.abs(deltaX) < 0.01 && Math.abs(deltaY) < 0.01) {
-            return
-        }
-        this.topologyPanX = Math.round(this.topologyPanX - deltaX)
-        this.topologyPanY = Math.round(this.topologyPanY - deltaY)
-        this.clearTopologyPointerSpaceCache()
-        this.scheduleTopologyRender()
+        this.wheelRafPending = true
+        const ctrlOrMeta = event.ctrlKey || event.metaKey
+        const deltaX = event.deltaX
+        const deltaY = event.deltaY
+        const deltaMode = event.deltaMode
+        const clientX = event.clientX
+        const clientY = event.clientY
+        requestAnimationFrame(() => {
+            this.wheelRafPending = false
+            if (ctrlOrMeta) {
+                const scaleFactor = deltaY < 0 ? 1.08 : (1 / 1.08)
+                this.adjustTopologyZoom(scaleFactor, clientX, clientY)
+                this.cdr.detectChanges()
+                return
+            }
+            const modeScale = deltaMode === WheelEvent.DOM_DELTA_LINE
+                ? 18
+                : (deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
+            const dx = Number.isFinite(deltaX) ? deltaX * modeScale : 0
+            const dy = Number.isFinite(deltaY) ? deltaY * modeScale : 0
+            if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
+                return
+            }
+            this.topologyPanX = Math.round(this.topologyPanX - dx)
+            this.topologyPanY = Math.round(this.topologyPanY - dy)
+            this.clearTopologyPointerSpaceCache()
+            this.scheduleTopologyRender()
+        })
     }
 
     runTopologyUndo (): void {
@@ -8592,6 +8628,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private boundOnMousemove = (e: MouseEvent) => this.onSidebarDrag(e)
     private boundOnMouseup = () => this.endSidebarDrag()
     private boundOnResize = () => this.onWindowResize()
+    private boundOnWheel = (e: WheelEvent) => this.onTopologyCanvasWheel(e)
+    private wheelRafPending = false
 
     async ngAfterViewInit (): Promise<void> {
         await this.initializeEditor()
@@ -8618,6 +8656,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         document.removeEventListener('mousemove', this.boundOnMousemove)
         document.removeEventListener('mouseup', this.boundOnMouseup)
         window.removeEventListener('resize', this.boundOnResize)
+        this.detachTopologyWheelListener()
         this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
