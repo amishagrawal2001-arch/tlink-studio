@@ -23,6 +23,12 @@ class SimpleJsonStore {
     }
 
     set (key: string, value: any): void {
+        // Re-read from disk to merge changes from other windows.
+        try {
+            this.data = JSON.parse(fs.readFileSync(this.filePath, 'utf8'))
+        } catch {
+            // keep current in-memory data
+        }
         this.data[key] = value
         try {
             fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2))
