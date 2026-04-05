@@ -4605,6 +4605,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }, 0)
             return
         }
+        this.flushTopologyPersist()
         this.detachTopologyWheelListener()
         this.topologyCanvasMode = false
         this.topologyParseError = ''
@@ -8167,6 +8168,25 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return `shape-${Date.now()}`
     }
 
+    private topologyPersistTimer?: number
+
+    private flushTopologyPersist (): void {
+        if (this.topologyPersistTimer) {
+            clearTimeout(this.topologyPersistTimer)
+            this.topologyPersistTimer = undefined
+            const doc = this.getActiveDoc()
+            if (this.topologyData && doc && this.isModelAlive(doc)) {
+                const serialized = `${JSON.stringify(this.topologyData, null, 2)}\n`
+                this.topologyWritingDoc = true
+                try {
+                    doc.model.setValue(serialized)
+                } finally {
+                    this.topologyWritingDoc = false
+                }
+            }
+        }
+    }
+
     private persistTopologyToDoc (): void {
         if (!this.topologyData) {
             return
@@ -8196,17 +8216,31 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             },
         }
         this.commitTopologyHistoryIfChanged(this.serializeTopology(next))
-        const serialized = `${JSON.stringify(next, null, 2)}\n`
-        this.topologyWritingDoc = true
-        try {
-            doc.model.setValue(serialized)
-            this.topologyData = next
-            this.rebuildTopologyLookupMaps()
-            this.invalidateTopologyLinkRenderItems()
-            this.topologyParseError = ''
-        } finally {
-            this.topologyWritingDoc = false
+
+        // Update in-memory topology state immediately for responsive UI.
+        this.topologyData = next
+        this.rebuildTopologyLookupMaps()
+        this.invalidateTopologyLinkRenderItems()
+        this.topologyParseError = ''
+
+        // Debounce the expensive Monaco model.setValue() to avoid blocking
+        // the UI thread on every incremental edit (add link, move node, etc.).
+        if (this.topologyPersistTimer) {
+            clearTimeout(this.topologyPersistTimer)
         }
+        this.topologyPersistTimer = window.setTimeout(() => {
+            this.topologyPersistTimer = undefined
+            if (!this.topologyData || !this.isModelAlive(doc)) {
+                return
+            }
+            const serialized = `${JSON.stringify(this.topologyData, null, 2)}\n`
+            this.topologyWritingDoc = true
+            try {
+                doc.model.setValue(serialized)
+            } finally {
+                this.topologyWritingDoc = false
+            }
+        }, 300)
     }
 
     get treeTopSpacerPx (): number {
@@ -8678,6 +8712,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         document.removeEventListener('mouseup', this.boundOnMouseup)
         window.removeEventListener('resize', this.boundOnResize)
         this.detachTopologyWheelListener()
+        this.flushTopologyPersist()
         this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
