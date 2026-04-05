@@ -1237,6 +1237,11 @@
         cursor: grabbing !important;
     }
 
+    &.link-mode,
+    &.link-mode .topology-node {
+        cursor: crosshair;
+    }
+
     &.dragging-node,
     &.dragging-shape {
         cursor: grabbing;

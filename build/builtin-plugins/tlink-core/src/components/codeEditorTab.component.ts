@@ -4230,9 +4230,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologySelectedLinkId = null
         this.topologySelectedShapeId = null
         this.topologySelectedTextId = null
-        this.topologyLinkPreviewActive = false
-        this.topologyPendingFreeLinkStart = null
-        this.topologyFreeLinkDraftEnd = null
+        // Only clear link preview when not in active link mode.
+        if (!this.topologyPendingLinkSourceId) {
+            this.topologyLinkPreviewActive = false
+            this.topologyPendingFreeLinkStart = null
+            this.topologyFreeLinkDraftEnd = null
+        }
     }
 
     private syncTopologyPrimarySelectionFromSets (): void {

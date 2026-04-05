@@ -606,7 +606,7 @@
                         | Delete
                 .topology-error(*ngIf='topologyParseError') {{topologyParseError}}
                 .topology-workspace(*ngIf='!topologyParseError', [class.inspector-visible]='hasTopologySelection')
-                    .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)')
+                    .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', [class.link-mode]='!!topologyPendingLinkSourceId || topologyLinkPreviewActive', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)')
                         .topology-viewport([style.transform]='cachedTopologyCanvasTransform')
                             svg.topology-links
                                 defs
