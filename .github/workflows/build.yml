@@ -49,8 +49,6 @@ jobs:
   macOS-Build:
     runs-on: macos-15
     needs: Lint
-    env:
-      HAS_MAC_SIGNING: ${{ secrets.CSC_LINK != '' }}
     strategy:
       matrix:
         include:
@@ -63,6 +61,7 @@ jobs:
     env:
       ARCH: ${{matrix.arch}}
       RUST_TARGET_TRIPLE: ${{matrix.rust_triple}}
+      HAS_MAC_SIGNING: ${{ secrets.CSC_LINK != '' }}
 
     steps:
     - name: Checkout
@@ -317,8 +316,6 @@ jobs:
   Windows-Build:
     runs-on: windows-latest
     needs: Lint
-    env:
-      HAS_WIN_SIGNING: ${{ secrets.SM_API_KEY != '' }}
     strategy:
       matrix:
         include:
@@ -330,6 +327,7 @@ jobs:
 
     env:
       RUST_TARGET_TRIPLE: ${{matrix.rust_triple}}
+      HAS_WIN_SIGNING: ${{ secrets.SM_API_KEY != '' }}
       ARCH: ${{matrix.arch}}
 
     steps:
