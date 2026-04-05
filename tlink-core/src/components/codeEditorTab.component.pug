@@ -178,7 +178,7 @@
                             |  — Run commands, execute scripts, and manage your development workflow without switching apps
                         li
                             strong Workspace Management
-                            |  — Organize projects with folder trees, git status tracking, session restore, and auto-save
+                            |  — Organize projects with folder trees, git status tracking, session restore, and auto-save. Collapse the file pane with the chevron button to maximize editor space
                 .help-section
                     .help-section-title
                         i.fas.fa-file
@@ -192,7 +192,7 @@
                             |  — Open files from filesystem or by entering a path
                         li
                             strong Save / Save All / Save As
-                            |  — Save current file, all open files, or save with a new name
+                            |  — Save current file, all open files, or save with a new name. Untitled files prompt for a name on first save
                         li
                             strong Duplicate / Move / Delete
                             |  — Duplicate current file, move to new location, or delete from disk
@@ -231,7 +231,7 @@
                             |  — Send selected text or run current file in terminal
                         li
                             strong Wrap / Minimap
-                            |  — Toggle word wrap and minimap visibility
+                            |  — Toggle word wrap (on by default) and minimap visibility. Wrap toggle also available on the toolbar
 
                 .help-section
                     .help-section-title
@@ -351,13 +351,19 @@
                             |  — Switch between text code editor and visual topology diagram canvas
                         li
                             strong Nodes & Links
-                            |  — Create network nodes and connect them with directed or bidirectional links
+                            |  — Create network nodes and connect them with directed or bidirectional links. Live link preview follows cursor from source node
+                        li
+                            strong Link Mode
+                            |  — Crosshair cursor when active. Drag nodes/shapes while in link mode. Click destination to complete link
                         li
                             strong Shapes
                             |  — Add rectangles, circles, ovals, and text labels to the canvas
                         li
                             strong Snap to Grid
                             |  — Align elements to a 24px grid for clean layouts
+                        li
+                            strong Zoom & Pan
+                            |  — Trackpad pinch-to-zoom with smooth accumulation. Scroll wheel to pan. Zoom +/- buttons with fit-to-view
                         li
                             strong Export as PNG
                             |  — Download the topology diagram as a high-resolution image
@@ -374,8 +380,30 @@
                             .help-keys
                                 kbd {{modKey}}
                                 | +
+                                kbd N
+                            span New file
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
                                 kbd S
                             span Save file
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd Alt
+                                | +
+                                kbd S
+                            span Save all
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd Shift
+                                | +
+                                kbd S
+                            span Save as
                         .help-shortcut-row
                             .help-keys
                                 kbd {{modKey}}
