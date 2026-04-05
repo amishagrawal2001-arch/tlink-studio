@@ -3384,6 +3384,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             window.setTimeout(() => {
                 if (this.statusMessage === `${nowExpanded ? 'Expanded' : 'Collapsed'}: ${node.name}`) {
                     this.statusMessage = ''
+                    this.cdr.markForCheck()
                 }
             }, 1200)
         } catch {
@@ -8495,6 +8496,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             window.setTimeout(() => {
                 if (this.statusMessage === `Explorer truncated to ${this.treeNodeBudget} entries`) {
                     this.statusMessage = ''
+                    this.cdr.markForCheck()
                 }
             }, 2200)
         }
@@ -10784,6 +10786,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.editMenuHoverCloseTimer = window.setTimeout(() => {
             this.editMenuHoverCloseTimer = undefined
             this.editMenuOpen = false
+            this.cdr.markForCheck()
         }, this.menuHoverCloseDelayMs)
     }
 
@@ -10893,6 +10896,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.fileMenuHoverCloseTimer = window.setTimeout(() => {
             this.fileMenuHoverCloseTimer = undefined
             this.fileMenuOpen = false
+            this.cdr.markForCheck()
         }, this.menuHoverCloseDelayMs)
     }
 
