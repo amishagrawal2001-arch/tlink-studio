@@ -312,6 +312,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     breadcrumbs: string[] = []
     statusMessage = ''
     sidebarWidth = 240
+    sidebarCollapsed = false
     private runTerminalTab: BaseTerminalTabComponentType | null = null
     pendingDiffDocId: string|null = null
     fileMenuOpen = false
@@ -11805,6 +11806,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return parts
     }
 
+    toggleSidebarCollapsed (): void {
+        this.sidebarCollapsed = !this.sidebarCollapsed
+        this.setStateItem('codeEditor.sidebarCollapsed', this.sidebarCollapsed ? '1' : '')
+        this.layoutEditors()
+        this.cdr.markForCheck()
+    }
+
     beginSidebarResize (event: MouseEvent): void {
         event.preventDefault()
         this.resizingSidebar = true
@@ -13331,6 +13339,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             if (!isNaN(parsed) && parsed >= 160 && parsed <= 480) {
                 this.sidebarWidth = parsed
             }
+        }
+        const savedCollapsed = this.getStateItem('codeEditor.sidebarCollapsed')
+        if (savedCollapsed !== null) {
+            this.sidebarCollapsed = savedCollapsed === '1'
         }
         const savedWordWrap = this.getStateItem('codeEditor.wordWrap')
         if (savedWordWrap !== null) {
