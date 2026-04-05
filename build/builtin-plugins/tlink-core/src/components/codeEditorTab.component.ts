@@ -4568,6 +4568,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyPendingFreeLinkStart = null
         this.topologyFreeLinkDraftEnd = null
         this.topologyFreeLinkCreating = false
+        this.topologyLinkPreviewActive = false
         this.clearTopologyPointerSpaceCache()
     }
 
@@ -4721,11 +4722,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.topologyFreeLinkPlacementDirected = null
             this.resetTopologyFreeLinkDraftState()
             this.cancelTopologyFreeLinkHandleDrag()
+            this.cdr.markForCheck()
             return
         }
         this.topologyFreeLinkPlacementDirected = directed
         this.resetTopologyFreeLinkDraftState()
         this.cancelTopologyFreeLinkHandleDrag()
+        this.cdr.markForCheck()
     }
 
     toggleTopologyLinkMode (): void {
@@ -4745,6 +4748,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.topologyPendingLinkSourceId = '__pending__'
             this.topologyPendingLinkSourceKind = null
         }
+        this.cdr.markForCheck()
     }
 
     toggleTopologyCurvedLinksMode (): void {
@@ -4775,6 +4779,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cancelTopologyFreeLinkHandleDrag()
         this.topologyStickyNotePlacementMode = false
         this.topologyTextPlacementMode = !this.topologyTextPlacementMode
+        this.cdr.markForCheck()
     }
 
     toggleTopologyStickyNotePlacementMode (): void {
@@ -4787,6 +4792,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cancelTopologyFreeLinkHandleDrag()
         this.topologyTextPlacementMode = false
         this.topologyStickyNotePlacementMode = !this.topologyStickyNotePlacementMode
+        this.cdr.markForCheck()
     }
 
     zoomTopologyIn (): void {
@@ -5637,6 +5643,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
+            this.topologyLinkPreviewActive = false
+            this.topologyPendingFreeLinkStart = null
+            this.topologyFreeLinkDraftEnd = null
             this.topologyPendingLinkSourceId = '__pending__'
             this.topologyPendingLinkSourceKind = null
             this.setTopologySingleSelection('shape', shapeId)
@@ -5646,6 +5655,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.topologyPendingLinkSourceId = shapeId
             this.topologyPendingLinkSourceKind = 'shape'
             this.setTopologySingleSelection('shape', shapeId)
+            // Start link preview from this shape.
+            const shape = this.topologyData.shapes.find(s => s.id === shapeId)
+            if (shape) {
+                const center = this.getTopologyShapeCenter(shape)
+                this.topologyPendingFreeLinkStart = center
+                this.topologyFreeLinkDraftEnd = center
+                this.topologyLinkPreviewActive = true
+            }
             return
         }
         const appendSelection = event.metaKey || event.ctrlKey || event.shiftKey
@@ -8205,14 +8222,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private topologyPersistTimer?: number
+    private topologyPersistDoc?: any
+    private topologyPersistSerialized?: string
 
     private flushTopologyPersist (): void {
         if (this.topologyPersistTimer) {
             clearTimeout(this.topologyPersistTimer)
             this.topologyPersistTimer = undefined
-            const doc = this.getActiveDoc()
-            if (this.topologyData && doc && this.isModelAlive(doc)) {
-                const serialized = `${JSON.stringify(this.topologyData, null, 2)}\n`
+            const doc = this.topologyPersistDoc
+            const serialized = this.topologyPersistSerialized
+            this.topologyPersistDoc = undefined
+            this.topologyPersistSerialized = undefined
+            if (doc && serialized && this.isModelAlive(doc)) {
                 this.topologyWritingDoc = true
                 try {
                     doc.model.setValue(serialized)
@@ -8261,21 +8282,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
         // Debounce the expensive Monaco model.setValue() to avoid blocking
         // the UI thread on every incremental edit (add link, move node, etc.).
+        // Capture the serialized data now so the timer closure doesn't read
+        // stale this.topologyData if the user switches documents.
+        this.topologyPersistDoc = doc
+        this.topologyPersistSerialized = `${JSON.stringify(next, null, 2)}\n`
         if (this.topologyPersistTimer) {
             clearTimeout(this.topologyPersistTimer)
         }
         this.topologyPersistTimer = window.setTimeout(() => {
-            this.topologyPersistTimer = undefined
-            if (!this.topologyData || !this.isModelAlive(doc)) {
-                return
-            }
-            const serialized = `${JSON.stringify(this.topologyData, null, 2)}\n`
-            this.topologyWritingDoc = true
-            try {
-                doc.model.setValue(serialized)
-            } finally {
-                this.topologyWritingDoc = false
-            }
+            this.flushTopologyPersist()
         }, 300)
     }
 
@@ -11189,6 +11204,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     activateDoc (docId: string, syncTreeSelection = true): void {
+        this.flushTopologyPersist()
         const doc = this.documents.find(d => d.id === docId)
         if (!doc) {
             return
@@ -13821,6 +13837,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             if (this.topologyDragNodeId) {
                 if (this.topologyDragChanged) {
                     this.topologyNodeWasDragged = true
+                    // Auto-clear the flag if the click event doesn't consume it
+                    // (e.g., pointer released outside the node).
+                    window.setTimeout(() => { this.topologyNodeWasDragged = false }, 0)
                     this.topologyDragChanged = false
                     this.persistTopologyToDoc()
                 }
