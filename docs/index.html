@@ -94,6 +94,7 @@
                 <a href="#features">Features</a>
                 <a href="#diagnostics">Diagnostics</a>
                 <a href="#topology">Topology</a>
+                <a href="#shortcuts">Shortcuts</a>
                 <a href="https://github.com/amishagrawal2001-arch/tlink-studio/releases#download">Download</a>
             </div>
             <div class="nav-actions">
@@ -205,13 +206,15 @@
                     <ul class="feature-detail-list">
                         <li><i class="fas fa-check"></i> Multi-document tabs with syntax highlighting</li>
                         <li><i class="fas fa-check"></i> Side-by-side diff view for file comparisons</li>
-                        <li><i class="fas fa-check"></i> File tree with full/opened file modes</li>
+                        <li><i class="fas fa-check"></i> Collapsible file tree with full/opened file modes</li>
                         <li><i class="fas fa-check"></i> Git status indicators (modified, staged, untracked)</li>
                         <li><i class="fas fa-check"></i> Real-time diagnostics panel with error/warning markers</li>
                         <li><i class="fas fa-check"></i> Smart indentation: auto-detect, convert tabs/spaces, mixed indent warning</li>
+                        <li><i class="fas fa-check"></i> Word wrap on by default with toolbar toggle</li>
                         <li><i class="fas fa-check"></i> Session restore with cursor &amp; scroll position</li>
                         <li><i class="fas fa-check"></i> External conflict detection when files change on disk</li>
                         <li><i class="fas fa-check"></i> Auto-save and state recovery on restart</li>
+                        <li><i class="fas fa-check"></i> Save-as dialog for untitled files on first save</li>
                         <li><i class="fas fa-check"></i> Responsive flex-wrap toolbar with theme &amp; palette controls</li>
                         <li><i class="fas fa-check"></i> Run code in integrated terminal</li>
                     </ul>
@@ -295,7 +298,7 @@
                 <div class="feature-card featured" style="border-color:rgba(6,182,212,0.3);background:linear-gradient(135deg,rgba(6,182,212,0.05),rgba(139,92,246,0.05))">
                     <div class="feature-icon" style="background:linear-gradient(135deg,#06b6d4,#22d3ee);color:white"><i class="fas fa-circle-nodes"></i></div>
                     <h3>Nodes & Links</h3>
-                    <p>Create network nodes and connect them with directed, undirected, or bidirectional links. Right-click any node or shape to add a link.</p>
+                    <p>Create network nodes and connect them with directed, undirected, or bidirectional links. Live link preview from source to cursor. Drag nodes while in link mode.</p>
                 </div>
                 <div class="feature-card featured" style="border-color:rgba(6,182,212,0.3);background:linear-gradient(135deg,rgba(6,182,212,0.05),rgba(139,92,246,0.05))">
                     <div class="feature-icon" style="background:linear-gradient(135deg,#06b6d4,#22d3ee);color:white"><i class="fas fa-shapes"></i></div>
@@ -335,7 +338,7 @@
                 <div class="feature-card">
                     <div class="feature-icon"><i class="fas fa-mouse-pointer"></i></div>
                     <h3>Interactive Editing</h3>
-                    <p>Click to select, drag to move, multi-select with marquee. Rich right-click context menus for nodes, shapes, and links.</p>
+                    <p>Click to select, drag to move, multi-select with marquee. Crosshair cursor in link mode. Smooth trackpad pinch-to-zoom. Rich right-click context menus for nodes, shapes, and links.</p>
                 </div>
             </div>
 
@@ -353,6 +356,37 @@
                         <i class="fas fa-code" style="color:#a78bfa;margin-right:6px"></i> Topology as JSON / Code View
                     </div>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Keyboard Shortcuts -->
+    <section id="shortcuts" class="section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge" style="background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.25);color:#a78bfa">Shortcuts</span>
+                <h2>Keyboard shortcuts</h2>
+                <p>Fast access to common actions. Cmd on macOS, Ctrl on Windows/Linux.</p>
+            </div>
+            <div class="vs-table">
+                <table>
+                    <tr><th style="text-align:left">Action</th><th>macOS</th><th>Windows / Linux</th></tr>
+                    <tr><td>New file</td><td>Cmd+N</td><td>Ctrl+N</td></tr>
+                    <tr><td>Save</td><td>Cmd+S</td><td>Ctrl+S</td></tr>
+                    <tr><td>Save all</td><td>Cmd+Alt+S</td><td>Ctrl+Alt+S</td></tr>
+                    <tr><td>Save as</td><td>Cmd+Shift+S</td><td>Ctrl+Shift+S</td></tr>
+                    <tr><td>Find</td><td>Cmd+F</td><td>Ctrl+F</td></tr>
+                    <tr><td>Replace</td><td>Cmd+H</td><td>Ctrl+H</td></tr>
+                    <tr><td>Go to line</td><td>Cmd+G</td><td>Ctrl+G</td></tr>
+                    <tr><td>Quick open</td><td>Cmd+P</td><td>Ctrl+P</td></tr>
+                    <tr><td>Undo</td><td>Cmd+Z</td><td>Ctrl+Z</td></tr>
+                    <tr><td>Redo</td><td>Cmd+Shift+Z</td><td>Ctrl+Shift+Z</td></tr>
+                    <tr><td>Toggle word wrap</td><td colspan="2">Via toolbar Wrap button</td></tr>
+                    <tr><td>Topology: Undo</td><td>Cmd+Z</td><td>Ctrl+Z</td></tr>
+                    <tr><td>Topology: Redo</td><td>Cmd+Shift+Z</td><td>Ctrl+Shift+Z</td></tr>
+                    <tr><td>Topology: Zoom</td><td colspan="2">Pinch trackpad or Ctrl+Scroll</td></tr>
+                    <tr><td>Topology: Pan</td><td colspan="2">Scroll wheel or drag empty canvas</td></tr>
+                </table>
             </div>
         </div>
     </section>
