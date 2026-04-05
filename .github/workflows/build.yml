@@ -49,6 +49,8 @@ jobs:
   macOS-Build:
     runs-on: macos-15
     needs: Lint
+    env:
+      HAS_MAC_SIGNING: ${{ secrets.CSC_LINK != '' }}
     strategy:
       matrix:
         include:
@@ -96,7 +98,7 @@ jobs:
 
     - name: Build and sign packages
       run: scripts/build-macos.mjs
-      if: ${{ github.event_name == 'push' && (github.ref_protected || startsWith(github.ref, 'refs/tags')) && secrets.CSC_LINK != '' }}
+      if: github.event_name == 'push' && (github.ref_protected || startsWith(github.ref, 'refs/tags')) && env.HAS_MAC_SIGNING == 'true'
       env:
         ARCH: ${{matrix.arch}}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -111,7 +113,7 @@ jobs:
 
     - name: Build packages without signing
       run: scripts/build-macos.mjs
-      if: ${{ !(github.event_name == 'push' && (github.ref_protected || startsWith(github.ref, 'refs/tags')) && secrets.CSC_LINK != '') }}
+      if: "!(github.event_name == 'push' && (github.ref_protected || startsWith(github.ref, 'refs/tags')) && env.HAS_MAC_SIGNING == 'true')"
       env:
         ARCH: ${{matrix.arch}}
         # DEBUG: electron-builder,electron-builder:*
@@ -266,7 +268,7 @@ jobs:
 
     - name: Upload packages to packagecloud.io
       uses: TykTechnologies/packagecloud-action@main
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && secrets.PACKAGECLOUD_TOKEN != '' }}
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       env:
         PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       with:
@@ -315,6 +317,8 @@ jobs:
   Windows-Build:
     runs-on: windows-latest
     needs: Lint
+    env:
+      HAS_WIN_SIGNING: ${{ secrets.SM_API_KEY != '' }}
     strategy:
       matrix:
         include:
@@ -336,7 +340,7 @@ jobs:
 
     - name: Code signing with Software Trust Manager
       uses: digicert/ssm-code-signing@v1.1.1
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && secrets.SM_API_KEY != '' }}
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.HAS_WIN_SIGNING == 'true'
       env:
         FORCE_DOWNLOAD_TOOLS: 'true'
 
@@ -364,7 +368,7 @@ jobs:
         ARCH: ${{matrix.arch}}
 
     - name: Decode certificate
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && secrets.SM_API_KEY != '' }}
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.HAS_WIN_SIGNING == 'true'
       env:
         SM_CLIENT_CERT_FILE_B64: ${{ secrets.SM_CLIENT_CERT_FILE_B64 }}
       run: |
@@ -374,7 +378,7 @@ jobs:
       shell: bash
 
     - name: Build and sign packages
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && secrets.SM_API_KEY != '' }}
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.HAS_WIN_SIGNING == 'true'
       shell: powershell
       run: |
         Get-FileHash $env:SM_CLIENT_CERT_FILE -Algorithm MD5
@@ -405,7 +409,7 @@ jobs:
 
     - name: Build packages without signing
       run: node scripts/build-windows.mjs
-      if: ${{ !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && secrets.SM_API_KEY != '') }}
+      if: "!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.HAS_WIN_SIGNING == 'true')"
       env:
         ARCH: ${{matrix.arch}}
 
