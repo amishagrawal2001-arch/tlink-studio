@@ -174,6 +174,7 @@ jobs:
       npm_config_arch: ${{matrix.build-arch}}
       npm_config_target_arch: ${{matrix.build-arch}}
       RUST_TARGET_TRIPLE: ${{matrix.rust_triple}}
+      HAS_PACKAGECLOUD: ${{ secrets.PACKAGECLOUD_TOKEN != '' }}
 
     steps:
     - name: Checkout
@@ -267,7 +268,7 @@ jobs:
 
     - name: Upload packages to packagecloud.io
       uses: TykTechnologies/packagecloud-action@main
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && env.HAS_PACKAGECLOUD == 'true'
       env:
         PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
       with:
