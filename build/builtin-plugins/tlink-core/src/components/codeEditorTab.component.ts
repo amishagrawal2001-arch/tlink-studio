@@ -4230,6 +4230,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologySelectedLinkId = null
         this.topologySelectedShapeId = null
         this.topologySelectedTextId = null
+        this.topologyLinkPreviewActive = false
+        this.topologyPendingFreeLinkStart = null
+        this.topologyFreeLinkDraftEnd = null
     }
 
     private syncTopologyPrimarySelectionFromSets (): void {
@@ -5408,7 +5411,23 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyNewLinksBidirectional = bidirectional
         this.topologyPendingLinkSourceId = itemId
         this.topologyPendingLinkSourceKind = kind
-        this.setTopologySingleSelection(kind, itemId)
+        this.setTopologySingleSelection(kind ?? 'node', itemId)
+
+        // Start live link preview from the source item's center.
+        let previewCenter: { x: number, y: number }|null = null
+        if (kind === 'shape') {
+            const shape = this.topologyData.shapes.find(s => s.id === itemId)
+            if (shape) { previewCenter = this.getTopologyShapeCenter(shape) }
+        } else {
+            const node = this.topologyData.nodes.find(n => n.id === itemId)
+            if (node) { previewCenter = this.getTopologyNodeCenter(node) }
+        }
+        if (previewCenter) {
+            this.topologyPendingFreeLinkStart = previewCenter
+            this.topologyFreeLinkDraftEnd = previewCenter
+            this.topologyFreeLinkPlacementDirected = directed ? true : null
+            this.topologyLinkPreviewActive = true
+        }
         this.cdr.markForCheck()
     }
 
@@ -5512,9 +5531,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.addTopologyTextAtPoint(point.x, point.y, true)
     }
 
+    private topologyNodeWasDragged = false
+    topologyLinkPreviewActive = false
+
     onTopologyNodeClick (event: MouseEvent, nodeId: string): void {
         event.stopPropagation()
         if (!this.topologyData) {
+            return
+        }
+        // Skip link creation if the user just finished dragging this node.
+        if (this.topologyNodeWasDragged) {
+            this.topologyNodeWasDragged = false
             return
         }
         const appendSelection = event.metaKey || event.ctrlKey || event.shiftKey
@@ -5537,6 +5564,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.topologyNewLinksBidirectional = false
                 this.persistTopologyToDoc()
             }
+            // Reset link preview and stay in link mode for chaining.
+            this.topologyLinkPreviewActive = false
+            this.topologyPendingFreeLinkStart = null
+            this.topologyFreeLinkDraftEnd = null
             this.topologyPendingLinkSourceId = '__pending__'
             this.topologyPendingLinkSourceKind = null
             this.setTopologySingleSelection('node', nodeId)
@@ -5546,6 +5577,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.topologyPendingLinkSourceId = nodeId
             this.topologyPendingLinkSourceKind = 'node'
             this.setTopologySingleSelection('node', nodeId)
+            // Start new link preview from this node.
+            const node = this.topologyNodeMap.get(nodeId)
+            if (node) {
+                const center = this.getTopologyNodeCenter(node)
+                this.topologyPendingFreeLinkStart = center
+                this.topologyFreeLinkDraftEnd = center
+                this.topologyLinkPreviewActive = true
+            }
             return
         }
         if (appendSelection) {
@@ -5776,9 +5815,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (this.hasTopologyInlineEdit()) {
             return
         }
-        if (this.topologyPendingLinkSourceId) {
-            return
-        }
         if (event.button !== 0) {
             return
         }
@@ -5895,9 +5931,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return
         }
         if (this.hasTopologyInlineEdit()) {
-            return
-        }
-        if (this.topologyPendingLinkSourceId) {
             return
         }
         if (event.button !== 0) {
@@ -13685,7 +13718,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     onSidebarDrag (event: MouseEvent): void {
-        if (!this.topologyPanDragActive && !this.topologyFreeLinkCreating && !this.topologyMarqueeActive && !this.topologyResizeNodeId && !this.topologyDragNodeId && !this.topologyDragFreeLinkId && !this.topologyResizeTextId && !this.topologyDragTextId && !this.topologyResizeShapeId && !this.topologyDragShapeId && !this.resizingSidebar) {
+        if (!this.topologyPanDragActive && !this.topologyFreeLinkCreating && !this.topologyMarqueeActive && !this.topologyResizeNodeId && !this.topologyDragNodeId && !this.topologyDragFreeLinkId && !this.topologyResizeTextId && !this.topologyDragTextId && !this.topologyResizeShapeId && !this.topologyDragShapeId && !this.topologyLinkPreviewActive && !this.resizingSidebar) {
             return
         }
         if (this.mousemoveRafPending) {
@@ -13740,6 +13773,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.moveTopologyDragShape(event)
             return
         }
+        if (this.topologyLinkPreviewActive) {
+            const point = this.getTopologyCanvasPoint(event.clientX, event.clientY)
+            if (point) {
+                this.topologyFreeLinkDraftEnd = point
+                this.cdr.markForCheck()
+            }
+            return
+        }
         if (!this.resizingSidebar) {
             return
         }
@@ -13775,11 +13816,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.cdr.markForCheck()
             }
             if (this.topologyDragNodeId) {
-                this.topologyDragNodeId = null
                 if (this.topologyDragChanged) {
+                    this.topologyNodeWasDragged = true
                     this.topologyDragChanged = false
                     this.persistTopologyToDoc()
                 }
+                this.topologyDragNodeId = null
                 this.cdr.markForCheck()
             }
             if (this.topologyDragFreeLinkId) {
