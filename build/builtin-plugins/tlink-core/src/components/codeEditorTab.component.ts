@@ -5067,36 +5067,48 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return
         }
         event.preventDefault()
+
+        const modeScale = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? 18
+            : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
+
+        if (event.ctrlKey || event.metaKey) {
+            // Pinch-to-zoom on trackpad or Ctrl+wheel: accumulate zoom factor.
+            const step = event.deltaY < 0 ? 1.04 : (1 / 1.04)
+            this.wheelAccumZoomFactor *= step
+        } else {
+            // Pan: accumulate deltas.
+            this.wheelAccumDeltaX += (Number.isFinite(event.deltaX) ? event.deltaX * modeScale : 0)
+            this.wheelAccumDeltaY += (Number.isFinite(event.deltaY) ? event.deltaY * modeScale : 0)
+        }
+        this.wheelLastClientX = event.clientX
+        this.wheelLastClientY = event.clientY
+
         if (this.wheelRafPending) {
             return
         }
         this.wheelRafPending = true
-        const ctrlOrMeta = event.ctrlKey || event.metaKey
-        const deltaX = event.deltaX
-        const deltaY = event.deltaY
-        const deltaMode = event.deltaMode
-        const clientX = event.clientX
-        const clientY = event.clientY
         requestAnimationFrame(() => {
             this.wheelRafPending = false
-            if (ctrlOrMeta) {
-                const scaleFactor = deltaY < 0 ? 1.08 : (1 / 1.08)
-                this.adjustTopologyZoom(scaleFactor, clientX, clientY)
-                this.cdr.detectChanges()
-                return
+
+            // Flush accumulated zoom.
+            if (this.wheelAccumZoomFactor !== 1) {
+                this.adjustTopologyZoom(this.wheelAccumZoomFactor, this.wheelLastClientX, this.wheelLastClientY)
+                this.wheelAccumZoomFactor = 1
             }
-            const modeScale = deltaMode === WheelEvent.DOM_DELTA_LINE
-                ? 18
-                : (deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
-            const dx = Number.isFinite(deltaX) ? deltaX * modeScale : 0
-            const dy = Number.isFinite(deltaY) ? deltaY * modeScale : 0
-            if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) {
-                return
+
+            // Flush accumulated pan.
+            if (Math.abs(this.wheelAccumDeltaX) > 0.01 || Math.abs(this.wheelAccumDeltaY) > 0.01) {
+                this.topologyPanX = Math.round(this.topologyPanX - this.wheelAccumDeltaX)
+                this.topologyPanY = Math.round(this.topologyPanY - this.wheelAccumDeltaY)
+                this.wheelAccumDeltaX = 0
+                this.wheelAccumDeltaY = 0
+                this.clearTopologyPointerSpaceCache()
             }
-            this.topologyPanX = Math.round(this.topologyPanX - dx)
-            this.topologyPanY = Math.round(this.topologyPanY - dy)
-            this.clearTopologyPointerSpaceCache()
-            this.scheduleTopologyRender()
+
+            this.updateTopologyCanvasTransform()
+            this.invalidateTopologyLinkRenderItems()
+            this.cdr.detectChanges()
         })
     }
 
@@ -7125,6 +7137,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyPanX = Math.round(rawX - worldX * nextZoom)
         this.topologyPanY = Math.round(rawY - worldY * nextZoom)
         this.clearTopologyPointerSpaceCache()
+        this.updateTopologyCanvasTransform()
+        this.invalidateTopologyLinkRenderItems()
         this.cdr.markForCheck()
     }
 
@@ -8632,6 +8646,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private boundOnResize = () => this.onWindowResize()
     private boundOnWheel = (e: WheelEvent) => this.onTopologyCanvasWheel(e)
     private wheelRafPending = false
+    private wheelAccumDeltaX = 0
+    private wheelAccumDeltaY = 0
+    private wheelAccumZoomFactor = 1
+    private wheelLastClientX = 0
+    private wheelLastClientY = 0
 
     async ngAfterViewInit (): Promise<void> {
         await this.initializeEditor()
