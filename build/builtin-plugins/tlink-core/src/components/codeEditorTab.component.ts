@@ -5521,6 +5521,46 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.addTopologyTextAtPoint(point.x, point.y, true, true)
     }
 
+    get hasTopologyItems (): boolean {
+        if (!this.topologyData) {
+            return false
+        }
+        return (this.topologyData.nodes.length + this.topologyData.links.length + (this.topologyData.shapes?.length ?? 0) + (this.topologyData.texts?.length ?? 0)) > 0
+    }
+
+    selectAllTopologyItems (): void {
+        this.topologyContextMenuOpen = false
+        this.topologyContextMenuPoint = null
+        if (!this.topologyData) {
+            return
+        }
+        this.topologySelectedNodeIds = new Set(this.topologyData.nodes.map(n => n.id))
+        this.topologySelectedLinkIds = new Set(this.topologyData.links.map(l => l.id))
+        this.topologySelectedShapeIds = new Set((this.topologyData.shapes ?? []).map(s => s.id))
+        this.topologySelectedTextIds = new Set((this.topologyData.texts ?? []).map(t => t.id))
+        this.syncTopologyPrimarySelectionFromSets()
+        this.cdr.markForCheck()
+    }
+
+    clearTopologyCanvas (): void {
+        this.topologyContextMenuOpen = false
+        this.topologyContextMenuPoint = null
+        if (!this.topologyData) {
+            return
+        }
+        // Save current state for undo before clearing.
+        this.commitTopologyHistoryIfChanged(this.serializeTopology(this.topologyData))
+        this.topologyData.nodes = []
+        this.topologyData.links = []
+        this.topologyData.shapes = []
+        this.topologyData.texts = []
+        this.clearTopologySelection()
+        this.rebuildTopologyLookupMaps()
+        this.invalidateTopologyLinkRenderItems()
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
     onTopologyCanvasDoubleClick (event: MouseEvent): void {
         if (event.button !== 0 || !this.topologyData) {
             return

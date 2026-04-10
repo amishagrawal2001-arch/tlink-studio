@@ -614,6 +614,12 @@
                     button(type='button', (click)='addStickyNoteFromTopologyContextMenu()')
                         i.fa.fa-sticky-note(style='margin-right: 6px;')
                         | Add sticky note
+                    button(type='button', (click)='selectAllTopologyItems()')
+                        i.fa.fa-object-group(style='margin-right: 6px;')
+                        | Select all
+                    button.text-danger(type='button', (click)='clearTopologyCanvas()', [disabled]='!hasTopologyItems')
+                        i.fa.fa-trash(style='margin-right: 6px;')
+                        | Clear canvas
                 .dropdown-menu.doc-context-menu.topology-context-menu(*ngIf='topologyNodeContextMenuOpen', [style.left.px]='topologyNodeContextMenuX', [style.top.px]='topologyNodeContextMenuY', (click)='$event.stopPropagation()')
                     button(type='button', (click)='addLinkFromNodeContextMenu(false, false)')
                         i.fa.fa-link(style='margin-right: 6px;')
