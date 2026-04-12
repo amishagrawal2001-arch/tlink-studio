@@ -313,6 +313,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     statusMessage = ''
     sidebarWidth = 240
     sidebarCollapsed = false
+    columnSelectionMode = true
     private runTerminalTab: BaseTerminalTabComponentType | null = null
     pendingDiffDocId: string|null = null
     fileMenuOpen = false
@@ -11496,7 +11497,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             renderLineHighlightOnlyWhenFocus: false,
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
-            columnSelection: true,
+            columnSelection: this.columnSelectionMode,
             multiCursorModifier: 'alt',
             // Enable code completion features
             quickSuggestions: {
@@ -11873,6 +11874,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
         }
         return parts
+    }
+
+    toggleColumnSelectionMode (): void {
+        this.columnSelectionMode = !this.columnSelectionMode
+        this.primaryEditor?.updateOptions({ columnSelection: this.columnSelectionMode })
+        this.splitEditor?.updateOptions({ columnSelection: this.columnSelectionMode })
+        this.setStateItem('codeEditor.columnSelection', this.columnSelectionMode ? '1' : '')
+        this.statusMessage = this.columnSelectionMode ? 'Column selection mode' : 'Line selection mode'
+        this.updateStatus()
     }
 
     toggleSidebarCollapsed (): void {
@@ -12750,6 +12760,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!editor?.addAction || (editor as any).__tlinkEditorContextActionsRegistered) {
             return
         }
+        const self = this
         editor.addAction({
             id: 'tlink.editor.addStickyNote',
             label: 'Add Sticky Note',
@@ -12757,6 +12768,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             contextMenuOrder: 2.95,
             run: async () => {
                 await this.addEditorStickyNote(editor)
+            },
+        })
+        editor.addAction({
+            id: 'tlink.editor.toggleSelectionMode',
+            get label () { return self.columnSelectionMode ? 'Selection: Column \u2192 Switch to Line' : 'Selection: Line \u2192 Switch to Column' },
+            contextMenuGroupId: 'z_selection',
+            contextMenuOrder: 1,
+            run: () => {
+                this.toggleColumnSelectionMode()
             },
         })
         ;(editor as any).__tlinkEditorContextActionsRegistered = true
@@ -13413,6 +13433,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const savedCollapsed = this.getStateItem('codeEditor.sidebarCollapsed')
         if (savedCollapsed !== null) {
             this.sidebarCollapsed = savedCollapsed === '1'
+        }
+        const savedColumnSelection = this.getStateItem('codeEditor.columnSelection')
+        if (savedColumnSelection !== null) {
+            this.columnSelectionMode = savedColumnSelection === '1'
         }
         const savedWordWrap = this.getStateItem('codeEditor.wordWrap')
         if (savedWordWrap !== null) {
