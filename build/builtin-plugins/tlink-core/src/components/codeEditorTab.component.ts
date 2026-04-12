@@ -12771,6 +12771,43 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             },
         })
         editor.addAction({
+            id: 'tlink.editor.changeAllOccurrences',
+            label: 'Change All Occurrences',
+            contextMenuGroupId: '1_modification',
+            contextMenuOrder: 2.96,
+            keybindings: this.monaco ? [this.monaco.KeyMod.CtrlCmd | this.monaco.KeyCode.F2] : [],
+            precondition: 'editorHasSelection',
+            run: () => {
+                // Try the built-in action first, fall back to manual implementation.
+                const builtIn = editor.getAction?.('editor.action.changeAll')
+                if (builtIn) {
+                    builtIn.run()
+                    return
+                }
+                // Manual fallback: select all occurrences of the selected text.
+                const selection = editor.getSelection()
+                const model = editor.getModel()
+                if (!selection || !model || selection.isEmpty()) {
+                    return
+                }
+                const selectedText = model.getValueInRange(selection)
+                if (!selectedText) {
+                    return
+                }
+                const matches = model.findMatches(selectedText, true, false, true, null, false)
+                if (!matches.length) {
+                    return
+                }
+                const selections = matches.map((m: any) => ({
+                    selectionStartLineNumber: m.range.startLineNumber,
+                    selectionStartColumn: m.range.startColumn,
+                    positionLineNumber: m.range.endLineNumber,
+                    positionColumn: m.range.endColumn,
+                }))
+                editor.setSelections(selections)
+            },
+        })
+        editor.addAction({
             id: 'tlink.editor.toggleSelectionMode',
             get label () { return self.columnSelectionMode ? 'Selection: Column \u2192 Switch to Line' : 'Selection: Line \u2192 Switch to Column' },
             contextMenuGroupId: 'z_selection',
