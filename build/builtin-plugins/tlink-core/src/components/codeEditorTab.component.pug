@@ -207,8 +207,8 @@
                         |  Edit Menu
                     ul.help-list
                         li
-                            strong Quick Open
-                            |  — Fuzzy file finder to quickly open files
+                            strong Quick Open ({{modKey}}+P)
+                            |  — Fuzzy file finder to quickly jump to any file by name across all open folders, without navigating the file tree
                         li
                             strong Undo / Redo
                             |  — Undo or redo last edit
@@ -219,8 +219,8 @@
                             strong Go to Line
                             |  — Jump to a specific line number
                         li
-                            strong Format / Format JSON
-                            |  — Auto-format code or pretty-print JSON
+                            strong Format / Format JSON / Format YAML
+                            |  — Auto-format code, pretty-print JSON, or reformat YAML with consistent indentation
                         li
                             strong Case Transforms
                             |  — Convert selection to uppercase, lowercase, or title case
@@ -233,6 +233,9 @@
                         li
                             strong Wrap / Minimap
                             |  — Toggle word wrap (on by default) and minimap visibility. Wrap toggle also available on the toolbar
+                        li
+                            strong Selection Mode (right-click)
+                            |  — Right-click in the editor to switch between line selection (default) and column/block selection mode
 
                 .help-section
                     .help-section-title
