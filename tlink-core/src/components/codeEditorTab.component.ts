@@ -313,7 +313,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     statusMessage = ''
     sidebarWidth = 240
     sidebarCollapsed = false
-    columnSelectionMode = true
+    columnSelectionMode = false
     private runTerminalTab: BaseTerminalTabComponentType | null = null
     pendingDiffDocId: string|null = null
     fileMenuOpen = false
