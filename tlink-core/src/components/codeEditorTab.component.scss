@@ -225,6 +225,23 @@
                 }
             }
 
+            .dropdown-section-label {
+                font-size: 10px;
+                font-weight: 600;
+                color: var(--theme-fg-less);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                padding: 6px 10px 2px;
+                cursor: default;
+                user-select: none;
+            }
+
+            button.active-item {
+                background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.12);
+                color: var(--theme-accent);
+                box-shadow: inset 2px 0 0 var(--theme-accent);
+            }
+
             &.diagnostics-panel {
                 min-width: 400px;
                 max-width: min(64vw, 760px);
@@ -474,6 +491,8 @@
             .dropdown-menu {
                 left: 0;
                 right: auto;
+                max-height: 70vh;
+                overflow-y: auto;
             }
         }
     }

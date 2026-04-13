@@ -43,6 +43,38 @@
                     button(type='button', (click)='handleEditAction("openClipboard")') Open clipboard
                     button(type='button', (click)='handleEditAction("wrap")') {{wordWrapEnabled ? 'Wrap off' : 'Wrap on'}}
                     button(type='button', (click)='handleEditAction("minimap")') {{minimapEnabled ? 'Hide minimap' : 'Show minimap'}}
+            .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
+                button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
+                .dropdown-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
+                    .dropdown-section-label Font Weight
+                    button(type='button', [class.active-item]='editorFontWeight==="normal"', (click)='handleFormatAction("fontWeightNormal")') Normal
+                    button(type='button', [class.active-item]='editorFontWeight==="bold"', (click)='handleFormatAction("fontWeightBold")') Bold
+                    .dropdown-section-label Letter Spacing
+                    button(type='button', [class.active-item]='editorLetterSpacing===0', (click)='handleFormatAction("letterSpacing0")') Default (0)
+                    button(type='button', [class.active-item]='editorLetterSpacing===1', (click)='handleFormatAction("letterSpacing1")') Wide (1px)
+                    button(type='button', [class.active-item]='editorLetterSpacing===2', (click)='handleFormatAction("letterSpacing2")') Extra wide (2px)
+                    .dropdown-section-label Cursor Style
+                    button(type='button', [class.active-item]='editorCursorStyle==="line"', (click)='handleFormatAction("cursorLine")') Line
+                    button(type='button', [class.active-item]='editorCursorStyle==="block"', (click)='handleFormatAction("cursorBlock")') Block
+                    button(type='button', [class.active-item]='editorCursorStyle==="underline"', (click)='handleFormatAction("cursorUnderline")') Underline
+                    .dropdown-section-label Cursor Animation
+                    button(type='button', [class.active-item]='editorCursorBlinking==="blink"', (click)='handleFormatAction("cursorBlink")') Blink
+                    button(type='button', [class.active-item]='editorCursorBlinking==="smooth"', (click)='handleFormatAction("cursorSmooth")') Smooth
+                    button(type='button', [class.active-item]='editorCursorBlinking==="solid"', (click)='handleFormatAction("cursorSolid")') Solid
+                    .dropdown-section-label Bracket Colorization
+                    button(type='button', [class.active-item]='editorBracketColorization', (click)='handleFormatAction("bracketColorOn")') On
+                    button(type='button', [class.active-item]='!editorBracketColorization', (click)='handleFormatAction("bracketColorOff")') Off
+                    .dropdown-section-label Render Whitespace
+                    button(type='button', [class.active-item]='editorRenderWhitespace==="none"', (click)='handleFormatAction("whitespaceNone")') None
+                    button(type='button', [class.active-item]='editorRenderWhitespace==="boundary"', (click)='handleFormatAction("whitespaceBoundary")') Boundary
+                    button(type='button', [class.active-item]='editorRenderWhitespace==="all"', (click)='handleFormatAction("whitespaceAll")') All
+                    .dropdown-section-label Smooth Scrolling
+                    button(type='button', [class.active-item]='editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOn")') On
+                    button(type='button', [class.active-item]='!editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOff")') Off
+                    .dropdown-section-label Line Numbers
+                    button(type='button', [class.active-item]='editorLineNumbersStyle==="on"', (click)='handleFormatAction("lineNumbersOn")') Absolute
+                    button(type='button', [class.active-item]='editorLineNumbersStyle==="relative"', (click)='handleFormatAction("lineNumbersRelative")') Relative
+                    button(type='button', [class.active-item]='editorLineNumbersStyle==="off"', (click)='handleFormatAction("lineNumbersOff")') Off
             select.form-select.form-select-sm((change)='handleRecentSelection($event)')
                 option(value='') Recent files
                 option(*ngFor='let item of recentFiles', [value]='item') {{item}}

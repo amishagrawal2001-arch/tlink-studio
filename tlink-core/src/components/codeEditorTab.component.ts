@@ -335,7 +335,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     pendingDiffDocId: string|null = null
     fileMenuOpen = false
     editMenuOpen = false
+    formatMenuOpen = false
     showDiagnostics = false
+
+    // Editor rendering options
+    editorFontWeight = 'normal'
+    editorLetterSpacing = 0
+    editorCursorStyle = 'line'
+    editorCursorBlinking = 'blink'
+    editorBracketColorization = true
+    editorRenderWhitespace = 'none'
+    editorSmoothScrolling = false
+    editorLineNumbersStyle = 'on'
     showIndentMenu = false
     indentMixedWarning = false
     showHelp = false
@@ -9657,6 +9668,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         event.stopPropagation()
         this.fileMenuOpen = false
         this.editMenuOpen = false
+        this.formatMenuOpen = false
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11040,6 +11052,150 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }, this.menuHoverCloseDelayMs)
     }
 
+    private formatMenuHoverCloseTimer?: number
+
+    toggleFormatMenu (event?: MouseEvent): void {
+        event?.stopPropagation()
+        this.fileMenuOpen = false
+        this.editMenuOpen = false
+        this.formatMenuOpen = !this.formatMenuOpen
+    }
+
+    openFormatMenuOnHover (): void {
+        this.cancelFormatMenuClose()
+        if (this.fileMenuOpen || this.editMenuOpen) {
+            this.fileMenuOpen = false
+            this.editMenuOpen = false
+            this.formatMenuOpen = true
+        }
+    }
+
+    keepFormatMenuOpenOnHover (): void {
+        this.cancelFormatMenuClose()
+        this.formatMenuOpen = true
+    }
+
+    closeFormatMenuOnLeave (): void {
+        this.cancelFormatMenuClose()
+        this.formatMenuHoverCloseTimer = window.setTimeout(() => {
+            this.formatMenuHoverCloseTimer = undefined
+            this.formatMenuOpen = false
+            this.cdr.markForCheck()
+        }, this.menuHoverCloseDelayMs)
+    }
+
+    private cancelFormatMenuClose (): void {
+        if (this.formatMenuHoverCloseTimer) {
+            clearTimeout(this.formatMenuHoverCloseTimer)
+            this.formatMenuHoverCloseTimer = undefined
+        }
+    }
+
+    handleFormatAction (action: string): void {
+        this.formatMenuOpen = false
+        const opts: any = {}
+        switch (action) {
+        case 'fontWeightNormal':
+            this.editorFontWeight = 'normal'
+            opts.fontWeight = 'normal'
+            break
+        case 'fontWeightBold':
+            this.editorFontWeight = 'bold'
+            opts.fontWeight = 'bold'
+            break
+        case 'letterSpacing0':
+            this.editorLetterSpacing = 0
+            opts.letterSpacing = 0
+            break
+        case 'letterSpacing1':
+            this.editorLetterSpacing = 1
+            opts.letterSpacing = 1
+            break
+        case 'letterSpacing2':
+            this.editorLetterSpacing = 2
+            opts.letterSpacing = 2
+            break
+        case 'cursorLine':
+            this.editorCursorStyle = 'line'
+            opts.cursorStyle = 'line'
+            break
+        case 'cursorBlock':
+            this.editorCursorStyle = 'block'
+            opts.cursorStyle = 'block'
+            break
+        case 'cursorUnderline':
+            this.editorCursorStyle = 'underline'
+            opts.cursorStyle = 'underline'
+            break
+        case 'cursorBlink':
+            this.editorCursorBlinking = 'blink'
+            opts.cursorBlinking = 'blink'
+            break
+        case 'cursorSmooth':
+            this.editorCursorBlinking = 'smooth'
+            opts.cursorBlinking = 'smooth'
+            break
+        case 'cursorSolid':
+            this.editorCursorBlinking = 'solid'
+            opts.cursorBlinking = 'solid'
+            break
+        case 'bracketColorOn':
+            this.editorBracketColorization = true
+            opts['bracketPairColorization.enabled'] = true
+            break
+        case 'bracketColorOff':
+            this.editorBracketColorization = false
+            opts['bracketPairColorization.enabled'] = false
+            break
+        case 'whitespaceNone':
+            this.editorRenderWhitespace = 'none'
+            opts.renderWhitespace = 'none'
+            break
+        case 'whitespaceBoundary':
+            this.editorRenderWhitespace = 'boundary'
+            opts.renderWhitespace = 'boundary'
+            break
+        case 'whitespaceAll':
+            this.editorRenderWhitespace = 'all'
+            opts.renderWhitespace = 'all'
+            break
+        case 'smoothScrollOn':
+            this.editorSmoothScrolling = true
+            opts.smoothScrolling = true
+            break
+        case 'smoothScrollOff':
+            this.editorSmoothScrolling = false
+            opts.smoothScrolling = false
+            break
+        case 'lineNumbersOn':
+            this.editorLineNumbersStyle = 'on'
+            opts.lineNumbers = 'on'
+            break
+        case 'lineNumbersRelative':
+            this.editorLineNumbersStyle = 'relative'
+            opts.lineNumbers = 'relative'
+            break
+        case 'lineNumbersOff':
+            this.editorLineNumbersStyle = 'off'
+            opts.lineNumbers = 'off'
+            break
+        default:
+            return
+        }
+        this.primaryEditor?.updateOptions(opts)
+        this.splitEditor?.updateOptions(opts)
+        this.setStateItem('codeEditor.formatOptions', JSON.stringify({
+            fontWeight: this.editorFontWeight,
+            letterSpacing: this.editorLetterSpacing,
+            cursorStyle: this.editorCursorStyle,
+            cursorBlinking: this.editorCursorBlinking,
+            bracketColorization: this.editorBracketColorization,
+            renderWhitespace: this.editorRenderWhitespace,
+            smoothScrolling: this.editorSmoothScrolling,
+            lineNumbers: this.editorLineNumbersStyle,
+        }))
+    }
+
     async handleEditAction (action: string): Promise<void> {
         switch (action) {
         case 'quickOpen':
@@ -11572,7 +11728,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             minimap: { enabled: this.minimapEnabled },
             theme: this.currentThemeId(),
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
-            lineNumbers: 'on',
             lineNumbersMinChars: 2,
             lineDecorationsWidth: 6,
             glyphMargin: false,
@@ -11582,6 +11737,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
             fontFamily: this.editorFontFamily || undefined,
+            fontWeight: this.editorFontWeight,
+            letterSpacing: this.editorLetterSpacing,
+            cursorStyle: this.editorCursorStyle,
+            cursorBlinking: this.editorCursorBlinking,
+            'bracketPairColorization.enabled': this.editorBracketColorization,
+            renderWhitespace: this.editorRenderWhitespace,
+            smoothScrolling: this.editorSmoothScrolling,
+            lineNumbers: this.editorLineNumbersStyle,
             columnSelection: this.columnSelectionMode,
             multiCursorModifier: 'alt',
             // Enable code completion features
@@ -13571,6 +13734,20 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const savedFontFamily = this.getStateItem('codeEditor.fontFamily')
         if (savedFontFamily !== null) {
             this.editorFontFamily = savedFontFamily
+        }
+        const savedFormatOptions = this.getStateItem('codeEditor.formatOptions')
+        if (savedFormatOptions) {
+            try {
+                const parsed = JSON.parse(savedFormatOptions)
+                if (parsed.fontWeight) { this.editorFontWeight = parsed.fontWeight }
+                if (Number.isFinite(parsed.letterSpacing)) { this.editorLetterSpacing = parsed.letterSpacing }
+                if (parsed.cursorStyle) { this.editorCursorStyle = parsed.cursorStyle }
+                if (parsed.cursorBlinking) { this.editorCursorBlinking = parsed.cursorBlinking }
+                if (typeof parsed.bracketColorization === 'boolean') { this.editorBracketColorization = parsed.bracketColorization }
+                if (parsed.renderWhitespace) { this.editorRenderWhitespace = parsed.renderWhitespace }
+                if (typeof parsed.smoothScrolling === 'boolean') { this.editorSmoothScrolling = parsed.smoothScrolling }
+                if (parsed.lineNumbers) { this.editorLineNumbersStyle = parsed.lineNumbers }
+            } catch { /* ignore */ }
         }
         const savedFontSize = this.getStateItem('codeEditor.fontSize')
         if (savedFontSize) {
