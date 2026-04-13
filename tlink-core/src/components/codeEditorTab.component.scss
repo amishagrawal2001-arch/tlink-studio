@@ -588,6 +588,10 @@
                 right: auto;
                 max-height: 70vh;
                 overflow-y: auto;
+
+                &.format-menu {
+                    overflow: visible;
+                }
             }
         }
     }
