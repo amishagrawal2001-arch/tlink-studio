@@ -115,16 +115,28 @@
                             button(type='button', [class.active-item]='editorLineNumbersStyle==="off"', (click)='handleFormatAction("lineNumbersOff")') Off
             .menu-container.left-menu((mouseenter)='openToolsMenuOnHover()', (mouseleave)='closeToolsMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleToolsMenu($event)', title='Tools') Tools
-                .dropdown-menu(*ngIf='toolsMenuOpen', (mouseenter)='keepToolsMenuOpenOnHover()', (mouseleave)='closeToolsMenuOnLeave()', (click)='$event.stopPropagation()')
-                    .dropdown-section-label Recent Files
-                    button(*ngFor='let item of recentFiles', type='button', (click)='openRecentFile(item)') {{item | slice:-40}}
-                    button(*ngIf='!recentFiles.length', type='button', disabled) No recent files
-                    .dropdown-section-label Diff
-                    button(type='button', (click)='toolsMenuOpen=false; compareWithDisk()', [disabled]='!documents.length') Diff vs disk
-                    button(type='button', (click)='toolsMenuOpen=false; exitDiffMode()', [disabled]='viewMode!=="diff"') Exit diff
-                    .dropdown-section-label Diff with document
-                    button(*ngFor='let item of diffCandidates', type='button', (click)='toolsMenuOpen=false; compareWithOtherDoc(item.id)') {{getDiffOptionLabel(item)}}
-                    button(*ngIf='!diffCandidates.length', type='button', disabled) No other documents open
+                .dropdown-menu.format-menu(*ngIf='toolsMenuOpen', (mouseenter)='keepToolsMenuOpenOnHover()', (mouseleave)='closeToolsMenuOnLeave()', (click)='$event.stopPropagation()')
+                    .submenu-parent((mouseenter)='toolsSubMenu="recent"')
+                        button.submenu-trigger(type='button') Recent Files
+                            span.submenu-value {{recentFiles.length || 0}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='toolsSubMenu==="recent"')
+                            button(*ngFor='let item of recentFiles', type='button', (click)='openRecentFile(item)') {{item | slice:-40}}
+                            button(*ngIf='!recentFiles.length', type='button', disabled) No recent files
+                    .submenu-parent((mouseenter)='toolsSubMenu="diff"')
+                        button.submenu-trigger(type='button') Diff
+                            span.submenu-value {{viewMode==="diff" ? "active" : ""}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='toolsSubMenu==="diff"')
+                            button(type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; compareWithDisk()', [disabled]='!documents.length') Diff vs disk
+                            button(type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; exitDiffMode()', [disabled]='viewMode!=="diff"') Exit diff
+                    .submenu-parent((mouseenter)='toolsSubMenu="diffWith"')
+                        button.submenu-trigger(type='button') Diff with Document
+                            span.submenu-value {{diffCandidates.length || 0}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='toolsSubMenu==="diffWith"')
+                            button(*ngFor='let item of diffCandidates', type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; compareWithOtherDoc(item.id)') {{getDiffOptionLabel(item)}}
+                            button(*ngIf='!diffCandidates.length', type='button', disabled) No other documents open
             .toolbar-separator
             label.font-control.theme-mode-control
                 span.small-label Theme

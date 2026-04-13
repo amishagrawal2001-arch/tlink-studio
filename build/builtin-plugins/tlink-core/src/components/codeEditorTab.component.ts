@@ -342,6 +342,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     formatMenuOpen = false
     formatSubMenu: string|null = null
     toolsMenuOpen = false
+    toolsSubMenu: string|null = null
     showDiagnostics = false
 
     // Editor rendering options
@@ -9690,6 +9691,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.formatMenuOpen = false
         this.formatSubMenu = null
         this.toolsMenuOpen = false
+        this.toolsSubMenu = null
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11040,6 +11042,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cancelEditMenuClose()
         this.cancelFileMenuClose()
         this.toolsMenuOpen = false
+        this.toolsSubMenu = null
         this.formatMenuOpen = false
         this.formatSubMenu = null
         this.editMenuOpen = !this.editMenuOpen
@@ -11148,6 +11151,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.toolsMenuHoverCloseTimer = window.setTimeout(() => {
             this.toolsMenuHoverCloseTimer = undefined
             this.toolsMenuOpen = false
+        this.toolsSubMenu = null
             this.cdr.markForCheck()
         }, this.menuHoverCloseDelayMs)
     }
@@ -11161,6 +11165,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     openRecentFile (filePath: string): void {
         this.toolsMenuOpen = false
+        this.toolsSubMenu = null
         if (filePath) {
             void this.openFileFromDiskPath(filePath)
         }
@@ -11352,6 +11357,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cancelFileMenuClose()
         this.cancelEditMenuClose()
         this.toolsMenuOpen = false
+        this.toolsSubMenu = null
         this.formatMenuOpen = false
         this.formatSubMenu = null
         this.fileMenuOpen = !this.fileMenuOpen
