@@ -251,11 +251,11 @@
                 .submenu-parent {
                     position: relative;
 
-                    &:hover > .submenu-panel {
+                    &.open > .submenu-panel {
                         display: flex;
                     }
 
-                    &:hover > .submenu-trigger {
+                    &.open > .submenu-trigger {
                         background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.18);
                         color: var(--theme-accent);
                     }
