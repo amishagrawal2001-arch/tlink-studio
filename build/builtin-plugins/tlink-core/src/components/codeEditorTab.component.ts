@@ -341,6 +341,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     editMenuOpen = false
     formatMenuOpen = false
     formatSubMenu: string|null = null
+    toolsMenuOpen = false
     showDiagnostics = false
 
     // Editor rendering options
@@ -9688,6 +9689,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.editMenuOpen = false
         this.formatMenuOpen = false
         this.formatSubMenu = null
+        this.toolsMenuOpen = false
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11037,6 +11039,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         event?.stopPropagation()
         this.cancelEditMenuClose()
         this.cancelFileMenuClose()
+        this.toolsMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
         this.editMenuOpen = !this.editMenuOpen
         if (this.editMenuOpen) {
             this.fileMenuOpen = false
@@ -11108,6 +11113,56 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (this.formatMenuHoverCloseTimer) {
             clearTimeout(this.formatMenuHoverCloseTimer)
             this.formatMenuHoverCloseTimer = undefined
+        }
+    }
+
+    private toolsMenuHoverCloseTimer?: number
+
+    toggleToolsMenu (event?: MouseEvent): void {
+        event?.stopPropagation()
+        this.fileMenuOpen = false
+        this.editMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
+        this.toolsMenuOpen = !this.toolsMenuOpen
+    }
+
+    openToolsMenuOnHover (): void {
+        this.cancelToolsMenuClose()
+        if (this.fileMenuOpen || this.editMenuOpen || this.formatMenuOpen) {
+            this.fileMenuOpen = false
+            this.editMenuOpen = false
+            this.formatMenuOpen = false
+            this.formatSubMenu = null
+            this.toolsMenuOpen = true
+        }
+    }
+
+    keepToolsMenuOpenOnHover (): void {
+        this.cancelToolsMenuClose()
+        this.toolsMenuOpen = true
+    }
+
+    closeToolsMenuOnLeave (): void {
+        this.cancelToolsMenuClose()
+        this.toolsMenuHoverCloseTimer = window.setTimeout(() => {
+            this.toolsMenuHoverCloseTimer = undefined
+            this.toolsMenuOpen = false
+            this.cdr.markForCheck()
+        }, this.menuHoverCloseDelayMs)
+    }
+
+    private cancelToolsMenuClose (): void {
+        if (this.toolsMenuHoverCloseTimer) {
+            clearTimeout(this.toolsMenuHoverCloseTimer)
+            this.toolsMenuHoverCloseTimer = undefined
+        }
+    }
+
+    openRecentFile (filePath: string): void {
+        this.toolsMenuOpen = false
+        if (filePath) {
+            void this.openFileFromDiskPath(filePath)
         }
     }
 
@@ -11296,6 +11351,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         event?.stopPropagation()
         this.cancelFileMenuClose()
         this.cancelEditMenuClose()
+        this.toolsMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
         this.fileMenuOpen = !this.fileMenuOpen
         if (this.fileMenuOpen) {
             this.editMenuOpen = false
