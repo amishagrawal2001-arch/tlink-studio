@@ -604,7 +604,7 @@
                 button(type='button', (click)='moveDocumentFromContextMenu(null)') Move to All documents
                 button(*ngFor='let folder of folders', type='button', (click)='moveDocumentFromContextMenu(folder.path)') Move to {{folder.name}}
                 button(type='button', (click)='closeDocumentFromContextMenu()') Close
-        .sidebar-resizer((mousedown)='beginSidebarResize($event)')
+        .sidebar-resizer(*ngIf='!sidebarCollapsed', (mousedown)='beginSidebarResize($event)')
         .editor-main(dropZone, (transfer)='onExternalTransfer($event)')
             .external-conflict-banner(*ngIf='activeExternalConflictDoc as conflictDoc')
                 span.banner-text External changes detected for {{conflictDoc.name}}. Choose how to continue.

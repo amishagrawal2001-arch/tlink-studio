@@ -11225,11 +11225,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             break
         case 'bracketColorOn':
             this.editorBracketColorization = true
-            opts['bracketPairColorization.enabled'] = true
+            opts.bracketPairColorization = { enabled: true }
             break
         case 'bracketColorOff':
             this.editorBracketColorization = false
-            opts['bracketPairColorization.enabled'] = false
+            opts.bracketPairColorization = { enabled: false }
             break
         case 'whitespaceNone':
             this.editorRenderWhitespace = 'none'
@@ -11831,7 +11831,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             letterSpacing: this.editorLetterSpacing,
             cursorStyle: this.editorCursorStyle,
             cursorBlinking: this.editorCursorBlinking,
-            'bracketPairColorization.enabled': this.editorBracketColorization,
+            bracketPairColorization: { enabled: this.editorBracketColorization },
             renderWhitespace: this.editorRenderWhitespace,
             smoothScrolling: this.editorSmoothScrolling,
             lineNumbers: this.editorLineNumbersStyle,
