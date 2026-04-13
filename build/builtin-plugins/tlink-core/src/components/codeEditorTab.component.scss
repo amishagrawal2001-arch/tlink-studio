@@ -242,6 +242,92 @@
                 box-shadow: inset 2px 0 0 var(--theme-accent);
             }
 
+            &.format-menu {
+                min-width: 180px;
+                max-height: none;
+                overflow: visible;
+                padding: 4px;
+
+                .submenu-parent {
+                    position: relative;
+
+                    .submenu-trigger {
+                        display: flex;
+                        align-items: center;
+                        width: 100%;
+                        text-align: left;
+                        padding: 6px 10px;
+                        background: transparent;
+                        border: none;
+                        color: var(--theme-fg);
+                        cursor: pointer;
+                        border-radius: 6px;
+                        font-weight: 500;
+                        font-size: inherit;
+                        gap: 8px;
+                        transition: background-color 0.15s ease;
+
+                        &:hover {
+                            background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.18);
+                            color: var(--theme-accent);
+                        }
+
+                        .submenu-value {
+                            margin-left: auto;
+                            font-size: 11px;
+                            color: var(--theme-fg-less);
+                            font-weight: 400;
+                        }
+
+                        .submenu-arrow {
+                            font-size: 9px;
+                            color: var(--theme-fg-less);
+                            flex-shrink: 0;
+                        }
+                    }
+
+                    .submenu-panel {
+                        position: absolute;
+                        left: 100%;
+                        top: 0;
+                        min-width: 140px;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+                        padding: 4px;
+                        background: var(--theme-bg);
+                        border: 1px solid var(--theme-bg-less);
+                        border-radius: 6px;
+                        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+                        z-index: 25;
+
+                        button {
+                            text-align: left;
+                            padding: 5px 10px;
+                            background: transparent;
+                            border: none;
+                            width: 100%;
+                            color: var(--theme-fg);
+                            cursor: pointer;
+                            border-radius: 4px;
+                            font-weight: 500;
+                            font-size: 12px;
+
+                            &:hover {
+                                background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.18);
+                                color: var(--theme-accent);
+                            }
+
+                            &.active-item {
+                                background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.12);
+                                color: var(--theme-accent);
+                                box-shadow: inset 2px 0 0 var(--theme-accent);
+                            }
+                        }
+                    }
+                }
+            }
+
             &.diagnostics-panel {
                 min-width: 400px;
                 max-width: min(64vw, 760px);

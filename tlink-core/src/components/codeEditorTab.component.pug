@@ -45,36 +45,68 @@
                     button(type='button', (click)='handleEditAction("minimap")') {{minimapEnabled ? 'Hide minimap' : 'Show minimap'}}
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
-                .dropdown-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
-                    .dropdown-section-label Font Weight
-                    button(type='button', [class.active-item]='editorFontWeight==="normal"', (click)='handleFormatAction("fontWeightNormal")') Normal
-                    button(type='button', [class.active-item]='editorFontWeight==="bold"', (click)='handleFormatAction("fontWeightBold")') Bold
-                    .dropdown-section-label Letter Spacing
-                    button(type='button', [class.active-item]='editorLetterSpacing===0', (click)='handleFormatAction("letterSpacing0")') Default (0)
-                    button(type='button', [class.active-item]='editorLetterSpacing===1', (click)='handleFormatAction("letterSpacing1")') Wide (1px)
-                    button(type='button', [class.active-item]='editorLetterSpacing===2', (click)='handleFormatAction("letterSpacing2")') Extra wide (2px)
-                    .dropdown-section-label Cursor Style
-                    button(type='button', [class.active-item]='editorCursorStyle==="line"', (click)='handleFormatAction("cursorLine")') Line
-                    button(type='button', [class.active-item]='editorCursorStyle==="block"', (click)='handleFormatAction("cursorBlock")') Block
-                    button(type='button', [class.active-item]='editorCursorStyle==="underline"', (click)='handleFormatAction("cursorUnderline")') Underline
-                    .dropdown-section-label Cursor Animation
-                    button(type='button', [class.active-item]='editorCursorBlinking==="blink"', (click)='handleFormatAction("cursorBlink")') Blink
-                    button(type='button', [class.active-item]='editorCursorBlinking==="smooth"', (click)='handleFormatAction("cursorSmooth")') Smooth
-                    button(type='button', [class.active-item]='editorCursorBlinking==="solid"', (click)='handleFormatAction("cursorSolid")') Solid
-                    .dropdown-section-label Bracket Colorization
-                    button(type='button', [class.active-item]='editorBracketColorization', (click)='handleFormatAction("bracketColorOn")') On
-                    button(type='button', [class.active-item]='!editorBracketColorization', (click)='handleFormatAction("bracketColorOff")') Off
-                    .dropdown-section-label Render Whitespace
-                    button(type='button', [class.active-item]='editorRenderWhitespace==="none"', (click)='handleFormatAction("whitespaceNone")') None
-                    button(type='button', [class.active-item]='editorRenderWhitespace==="boundary"', (click)='handleFormatAction("whitespaceBoundary")') Boundary
-                    button(type='button', [class.active-item]='editorRenderWhitespace==="all"', (click)='handleFormatAction("whitespaceAll")') All
-                    .dropdown-section-label Smooth Scrolling
-                    button(type='button', [class.active-item]='editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOn")') On
-                    button(type='button', [class.active-item]='!editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOff")') Off
-                    .dropdown-section-label Line Numbers
-                    button(type='button', [class.active-item]='editorLineNumbersStyle==="on"', (click)='handleFormatAction("lineNumbersOn")') Absolute
-                    button(type='button', [class.active-item]='editorLineNumbersStyle==="relative"', (click)='handleFormatAction("lineNumbersRelative")') Relative
-                    button(type='button', [class.active-item]='editorLineNumbersStyle==="off"', (click)='handleFormatAction("lineNumbersOff")') Off
+                .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
+                    .submenu-parent((mouseenter)='formatSubMenu="fontWeight"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Font Weight
+                            span.submenu-value {{editorFontWeight}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="fontWeight"')
+                            button(type='button', [class.active-item]='editorFontWeight==="normal"', (click)='handleFormatAction("fontWeightNormal")') Normal
+                            button(type='button', [class.active-item]='editorFontWeight==="bold"', (click)='handleFormatAction("fontWeightBold")') Bold
+                    .submenu-parent((mouseenter)='formatSubMenu="letterSpacing"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Letter Spacing
+                            span.submenu-value {{editorLetterSpacing}}px
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="letterSpacing"')
+                            button(type='button', [class.active-item]='editorLetterSpacing===0', (click)='handleFormatAction("letterSpacing0")') Default (0)
+                            button(type='button', [class.active-item]='editorLetterSpacing===1', (click)='handleFormatAction("letterSpacing1")') Wide (1px)
+                            button(type='button', [class.active-item]='editorLetterSpacing===2', (click)='handleFormatAction("letterSpacing2")') Extra wide (2px)
+                    .submenu-parent((mouseenter)='formatSubMenu="cursorStyle"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Cursor Style
+                            span.submenu-value {{editorCursorStyle}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="cursorStyle"')
+                            button(type='button', [class.active-item]='editorCursorStyle==="line"', (click)='handleFormatAction("cursorLine")') Line
+                            button(type='button', [class.active-item]='editorCursorStyle==="block"', (click)='handleFormatAction("cursorBlock")') Block
+                            button(type='button', [class.active-item]='editorCursorStyle==="underline"', (click)='handleFormatAction("cursorUnderline")') Underline
+                    .submenu-parent((mouseenter)='formatSubMenu="cursorAnim"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Cursor Animation
+                            span.submenu-value {{editorCursorBlinking}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="cursorAnim"')
+                            button(type='button', [class.active-item]='editorCursorBlinking==="blink"', (click)='handleFormatAction("cursorBlink")') Blink
+                            button(type='button', [class.active-item]='editorCursorBlinking==="smooth"', (click)='handleFormatAction("cursorSmooth")') Smooth
+                            button(type='button', [class.active-item]='editorCursorBlinking==="solid"', (click)='handleFormatAction("cursorSolid")') Solid
+                    .submenu-parent((mouseenter)='formatSubMenu="bracket"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Bracket Colors
+                            span.submenu-value {{editorBracketColorization ? 'on' : 'off'}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="bracket"')
+                            button(type='button', [class.active-item]='editorBracketColorization', (click)='handleFormatAction("bracketColorOn")') On
+                            button(type='button', [class.active-item]='!editorBracketColorization', (click)='handleFormatAction("bracketColorOff")') Off
+                    .submenu-parent((mouseenter)='formatSubMenu="whitespace"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Whitespace
+                            span.submenu-value {{editorRenderWhitespace}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="whitespace"')
+                            button(type='button', [class.active-item]='editorRenderWhitespace==="none"', (click)='handleFormatAction("whitespaceNone")') None
+                            button(type='button', [class.active-item]='editorRenderWhitespace==="boundary"', (click)='handleFormatAction("whitespaceBoundary")') Boundary
+                            button(type='button', [class.active-item]='editorRenderWhitespace==="all"', (click)='handleFormatAction("whitespaceAll")') All
+                    .submenu-parent((mouseenter)='formatSubMenu="smoothScroll"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Smooth Scrolling
+                            span.submenu-value {{editorSmoothScrolling ? 'on' : 'off'}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="smoothScroll"')
+                            button(type='button', [class.active-item]='editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOn")') On
+                            button(type='button', [class.active-item]='!editorSmoothScrolling', (click)='handleFormatAction("smoothScrollOff")') Off
+                    .submenu-parent((mouseenter)='formatSubMenu="lineNumbers"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Line Numbers
+                            span.submenu-value {{editorLineNumbersStyle}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="lineNumbers"')
+                            button(type='button', [class.active-item]='editorLineNumbersStyle==="on"', (click)='handleFormatAction("lineNumbersOn")') Absolute
+                            button(type='button', [class.active-item]='editorLineNumbersStyle==="relative"', (click)='handleFormatAction("lineNumbersRelative")') Relative
+                            button(type='button', [class.active-item]='editorLineNumbersStyle==="off"', (click)='handleFormatAction("lineNumbersOff")') Off
             select.form-select.form-select-sm((change)='handleRecentSelection($event)')
                 option(value='') Recent files
                 option(*ngFor='let item of recentFiles', [value]='item') {{item}}

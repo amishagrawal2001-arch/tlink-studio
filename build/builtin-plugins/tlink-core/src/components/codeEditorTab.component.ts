@@ -336,6 +336,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     fileMenuOpen = false
     editMenuOpen = false
     formatMenuOpen = false
+    formatSubMenu: string|null = null
     showDiagnostics = false
 
     // Editor rendering options
@@ -9682,6 +9683,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.fileMenuOpen = false
         this.editMenuOpen = false
         this.formatMenuOpen = false
+        this.formatSubMenu = null
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11093,6 +11095,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.formatMenuHoverCloseTimer = window.setTimeout(() => {
             this.formatMenuHoverCloseTimer = undefined
             this.formatMenuOpen = false
+        this.formatSubMenu = null
             this.cdr.markForCheck()
         }, this.menuHoverCloseDelayMs)
     }
@@ -11106,6 +11109,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     handleFormatAction (action: string): void {
         this.formatMenuOpen = false
+        this.formatSubMenu = null
         const opts: any = {}
         switch (action) {
         case 'fontWeightNormal':
