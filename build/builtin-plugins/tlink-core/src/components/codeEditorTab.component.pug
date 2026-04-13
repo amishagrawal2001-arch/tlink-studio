@@ -46,6 +46,12 @@
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
                 .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
+                    .submenu-parent((mouseenter)='formatSubMenu="fontFamily"', (mouseleave)='formatSubMenu=null')
+                        button.submenu-trigger(type='button') Font Family
+                            span.submenu-value {{editorFontFamilyLabel}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel(*ngIf='formatSubMenu==="fontFamily"')
+                            button(*ngFor='let opt of editorFontFamilyOptions', type='button', [class.active-item]='editorFontFamily===opt.value', (click)='setEditorFontFamily(opt.value); formatMenuOpen=false; formatSubMenu=null') {{opt.label}}
                     .submenu-parent((mouseenter)='formatSubMenu="fontWeight"', (mouseleave)='formatSubMenu=null')
                         button.submenu-trigger(type='button') Font Weight
                             span.submenu-value {{editorFontWeight}}
@@ -203,10 +209,6 @@
                         span Mixed indentation detected in this file
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEOL()') {{statusEOL || 'EOL'}}
             .toolbar-separator
-            label.font-control
-                span.small-label Family
-                select.form-select.form-select-sm([value]='editorFontFamily', (change)='setEditorFontFamily($event.target.value)')
-                    option(*ngFor='let opt of editorFontFamilyOptions', [value]='opt.value') {{opt.label}}
             label.font-control
                 span.small-label Font
                 input.form-control.form-control-sm(type='number', [value]='fontSize', min='10', max='28', (change)='setFontSize($event.target.valueAsNumber)')

@@ -322,6 +322,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         { label: 'Consolas', value: "Consolas, monospace" },
         { label: 'Courier New', value: "'Courier New', monospace" },
     ]
+    get editorFontFamilyLabel (): string {
+        return this.editorFontFamilyOptions.find(o => o.value === this.editorFontFamily)?.label ?? 'Default'
+    }
+
     lineHeight = 22
     autosaveEnabled = true
     autosaveIntervalMs = 15000
