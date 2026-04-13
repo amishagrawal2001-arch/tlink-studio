@@ -314,13 +314,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     editorFontFamily = ''
     readonly editorFontFamilyOptions = [
         { label: 'Default', value: '' },
-        { label: 'JetBrains Mono', value: "'JetBrains Mono', monospace" },
-        { label: 'Fira Code', value: "'Fira Code', monospace" },
-        { label: 'Source Code Pro', value: "'Source Code Pro', monospace" },
-        { label: 'Cascadia Code', value: "'Cascadia Code', monospace" },
-        { label: 'Menlo', value: "Menlo, monospace" },
-        { label: 'Consolas', value: "Consolas, monospace" },
-        { label: 'Courier New', value: "'Courier New', monospace" },
+        { label: 'Source Code Pro', value: 'Source Code Pro, monospace' },
+        { label: 'Menlo', value: 'Menlo, Monaco, monospace' },
+        { label: 'Consolas', value: 'Consolas, monospace' },
+        { label: 'Courier New', value: 'Courier New, monospace' },
+        { label: 'JetBrains Mono', value: 'JetBrains Mono, monospace' },
+        { label: 'Fira Code', value: 'Fira Code, monospace' },
+        { label: 'Cascadia Code', value: 'Cascadia Code, monospace' },
+        { label: 'Monaco', value: 'Monaco, monospace' },
+        { label: 'Lucida Console', value: 'Lucida Console, monospace' },
     ]
     get editorFontFamilyLabel (): string {
         return this.editorFontFamilyOptions.find(o => o.value === this.editorFontFamily)?.label ?? 'Default'
@@ -10454,9 +10456,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     setEditorFontFamily (value: string): void {
         this.editorFontFamily = value
-        const opts: any = { fontFamily: value || undefined }
-        this.primaryEditor?.updateOptions(opts)
-        this.splitEditor?.updateOptions(opts)
+        // Monaco default: Menlo, Monaco, Consolas, monospace
+        const fontFamily = value || "Menlo, Monaco, 'Courier New', monospace"
+        this.primaryEditor?.updateOptions({ fontFamily })
+        this.splitEditor?.updateOptions({ fontFamily })
         this.setStateItem('codeEditor.fontFamily', value)
         this.persistState()
     }
@@ -11823,7 +11826,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             renderLineHighlightOnlyWhenFocus: false,
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
-            fontFamily: this.editorFontFamily || undefined,
+            fontFamily: this.editorFontFamily || "Menlo, Monaco, 'Courier New', monospace",
             fontWeight: this.editorFontWeight,
             letterSpacing: this.editorLetterSpacing,
             cursorStyle: this.editorCursorStyle,
