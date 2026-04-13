@@ -1831,6 +1831,29 @@
             margin: 0;
         }
 
+        .inspector-format-bar {
+            display: flex;
+            gap: 2px;
+            flex-wrap: wrap;
+
+            .format-btn {
+                width: 28px;
+                height: 28px;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                border-radius: 4px;
+
+                &.active {
+                    background: var(--theme-accent, #4f9cff);
+                    color: white;
+                    border-color: var(--theme-accent, #4f9cff);
+                }
+            }
+        }
+
         .topology-inspector-icon-action {
             width: 16px;
             height: 16px;

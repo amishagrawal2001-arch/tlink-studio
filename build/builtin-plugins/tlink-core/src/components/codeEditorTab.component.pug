@@ -140,6 +140,10 @@
             button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEOL()') {{statusEOL || 'EOL'}}
             .toolbar-separator
             label.font-control
+                span.small-label Family
+                select.form-select.form-select-sm([value]='editorFontFamily', (change)='setEditorFontFamily($event.target.value)')
+                    option(*ngFor='let opt of editorFontFamilyOptions', [value]='opt.value') {{opt.label}}
+            label.font-control
                 span.small-label Font
                 input.form-control.form-control-sm(type='number', [value]='fontSize', min='10', max='28', (change)='setFontSize($event.target.valueAsNumber)')
             label.font-control
@@ -673,7 +677,7 @@
                                 input.topology-inline-input(*ngIf='isTopologyInlineEditingShape(shape.id)', type='text', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"shape"', [attr.data-inline-id]='shape.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
                                 span.topology-shape-label(*ngIf='!isTopologyInlineEditingShape(shape.id) && shape.label') {{shape.label}}
                                 span.topology-item-resize-handle(*ngIf='isTopologyShapeSelected(shape.id)', (mousedown)='startTopologyShapeResize($event, shape.id)', (click)='$event.stopPropagation()')
-                            .topology-text-label(*ngFor='let item of topologyTexts; trackBy: trackTopologyText', [class.selected]='isTopologyTextSelected(item.id)', [class.sticky-note]='item.sticky===true', [class.collapsed]='isTopologyStickyCollapsed(item)', [style.left.px]='item.x', [style.top.px]='item.y', [style.width.px]='getTopologyTextWidth(item)', [style.height.px]='getTopologyTextHeight(item)', [style.--topology-sticky-bg]='getTopologyStickyNoteBackgroundColor(item)', [style.--topology-sticky-fg]='item.sticky ? getTopologyStickyNoteTextColor(item) : null', [style.color]='item.sticky ? null : getTopologyTextDisplayColor(item)', (mousedown)='startTopologyTextDrag($event, item.id)', (click)='onTopologyTextClick($event, item.id)', (dblclick)='editTopologyTextFromDoubleClick($event, item.id)')
+                            .topology-text-label(*ngFor='let item of topologyTexts; trackBy: trackTopologyText', [class.selected]='isTopologyTextSelected(item.id)', [class.sticky-note]='item.sticky===true', [class.collapsed]='isTopologyStickyCollapsed(item)', [style.left.px]='item.x', [style.top.px]='item.y', [style.width.px]='getTopologyTextWidth(item)', [style.height.px]='getTopologyTextHeight(item)', [style.--topology-sticky-bg]='getTopologyStickyNoteBackgroundColor(item)', [style.--topology-sticky-fg]='item.sticky ? getTopologyStickyNoteTextColor(item) : null', [style.color]='item.sticky ? null : getTopologyTextDisplayColor(item)', [style.font-size.px]='item.fontSize || 14', [style.font-weight]='item.fontWeight || "normal"', [style.font-style]='item.fontStyle || "normal"', [style.text-decoration]='item.textDecoration || "none"', [style.text-align]='item.textAlign || "left"', [style.text-shadow]='item.textShadow ? "1px 1px 3px rgba(0,0,0,0.3)" : "none"', (mousedown)='startTopologyTextDrag($event, item.id)', (click)='onTopologyTextClick($event, item.id)', (dblclick)='editTopologyTextFromDoubleClick($event, item.id)')
                                 span.topology-sticky-collapse-icon(*ngIf='item.sticky', role='button', tabindex='0', [attr.aria-label]='isTopologyStickyCollapsed(item) ? "Expand sticky note" : "Collapse sticky note"', [attr.title]='isTopologyStickyCollapsed(item) ? "Expand note" : "Collapse note"', (mousedown)='$event.stopPropagation()', (click)='toggleTopologyStickyCollapsed($event, item.id)')
                                     i.fas([ngClass]='isTopologyStickyCollapsed(item) ? "fa-chevron-down" : "fa-chevron-up"')
                                 textarea.topology-inline-input.topology-inline-input-text.topology-inline-input-textarea(*ngIf='item.sticky && isTopologyInlineEditingText(item.id) && !isTopologyStickyCollapsed(item)', rows='4', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"text"', [attr.data-inline-id]='item.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event, true)', (blur)='onTopologyInlineEditBlur()')
@@ -783,6 +787,26 @@
                             label {{item.sticky ? "Note color" : "Color"}}
                             select.form-select.form-select-sm([value]='selectedTopologyTextColor', (change)='updateSelectedTopologyTextColor($event.target.value)')
                                 option(*ngFor='let option of topologyTextColorOptions', [value]='option.value') {{option.label}}
+                            label Font size
+                            input.form-control.form-control-sm(type='number', [value]='item.fontSize || 14', min='8', max='48', (change)='updateSelectedTopologyTextFontSize($event.target.valueAsNumber)')
+                            .inspector-format-bar
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.fontWeight==="bold"', title='Bold', (click)='toggleSelectedTopologyTextBold()')
+                                    i.fas.fa-bold
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.fontStyle==="italic"', title='Italic', (click)='toggleSelectedTopologyTextItalic()')
+                                    i.fas.fa-italic
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.textDecoration==="underline"', title='Underline', (click)='toggleSelectedTopologyTextUnderline()')
+                                    i.fas.fa-underline
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.textDecoration==="line-through"', title='Strikethrough', (click)='toggleSelectedTopologyTextStrikethrough()')
+                                    i.fas.fa-strikethrough
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.textShadow', title='Text shadow', (click)='toggleSelectedTopologyTextShadow()')
+                                    i.fas.fa-clone
+                            .inspector-format-bar
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='(item.textAlign || "left")==="left"', title='Align left', (click)='updateSelectedTopologyTextAlign("left")')
+                                    i.fas.fa-align-left
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.textAlign==="center"', title='Align center', (click)='updateSelectedTopologyTextAlign("center")')
+                                    i.fas.fa-align-center
+                                button.btn.btn-sm.btn-outline-secondary.format-btn(type='button', [class.active]='item.textAlign==="right"', title='Align right', (click)='updateSelectedTopologyTextAlign("right")')
+                                    i.fas.fa-align-right
                             label(*ngIf='item.sticky') Width
                             input.form-control.form-control-sm(*ngIf='item.sticky', type='number', [value]='item.width || 350', min='100', (change)='updateSelectedTopologyTextSize("width", $event.target.valueAsNumber)')
                             label(*ngIf='item.sticky') Height

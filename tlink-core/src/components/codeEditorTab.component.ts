@@ -149,6 +149,12 @@ interface TopologyTextModel {
     width?: number
     height?: number
     color?: string
+    fontSize?: number
+    fontWeight?: 'normal'|'bold'
+    fontStyle?: 'normal'|'italic'
+    textDecoration?: 'none'|'underline'|'line-through'
+    textAlign?: 'left'|'center'|'right'
+    textShadow?: boolean
 }
 
 interface TopologyDocumentModel {
@@ -305,6 +311,17 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         { label: 'Slate', value: '#94a3b8' },
     ]
     fontSize = 14
+    editorFontFamily = ''
+    readonly editorFontFamilyOptions = [
+        { label: 'Default', value: '' },
+        { label: 'JetBrains Mono', value: "'JetBrains Mono', monospace" },
+        { label: 'Fira Code', value: "'Fira Code', monospace" },
+        { label: 'Source Code Pro', value: "'Source Code Pro', monospace" },
+        { label: 'Cascadia Code', value: "'Cascadia Code', monospace" },
+        { label: 'Menlo', value: "Menlo, monospace" },
+        { label: 'Consolas', value: "Consolas, monospace" },
+        { label: 'Courier New', value: "'Courier New', monospace" },
+    ]
     lineHeight = 22
     autosaveEnabled = true
     autosaveIntervalMs = 15000
@@ -6357,6 +6374,64 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    updateSelectedTopologyTextFontSize (value: number): void {
+        const item = this.selectedTopologyText
+        if (!item || !Number.isFinite(value)) {
+            return
+        }
+        item.fontSize = Math.max(8, Math.min(48, Math.round(value)))
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    toggleSelectedTopologyTextBold (): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.fontWeight = item.fontWeight === 'bold' ? 'normal' : 'bold'
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    toggleSelectedTopologyTextItalic (): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.fontStyle = item.fontStyle === 'italic' ? 'normal' : 'italic'
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    toggleSelectedTopologyTextUnderline (): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.textDecoration = item.textDecoration === 'underline' ? 'none' : 'underline'
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    toggleSelectedTopologyTextStrikethrough (): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.textDecoration = item.textDecoration === 'line-through' ? 'none' : 'line-through'
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    toggleSelectedTopologyTextShadow (): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.textShadow = !item.textShadow
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    updateSelectedTopologyTextAlign (value: string): void {
+        const item = this.selectedTopologyText
+        if (!item) { return }
+        item.textAlign = (value as any) || 'left'
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
     updateSelectedTopologyTextSize (axis: 'width'|'height', value: number): void {
         const item = this.selectedTopologyText
         if (!item?.sticky || !Number.isFinite(value)) {
@@ -10342,6 +10417,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.updateStatus()
     }
 
+    setEditorFontFamily (value: string): void {
+        this.editorFontFamily = value
+        const opts: any = { fontFamily: value || undefined }
+        this.primaryEditor?.updateOptions(opts)
+        this.splitEditor?.updateOptions(opts)
+        this.setStateItem('codeEditor.fontFamily', value)
+        this.persistState()
+    }
+
     setFontSize (value: number): void {
         if (!value) {
             return
@@ -11497,6 +11581,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             renderLineHighlightOnlyWhenFocus: false,
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
+            fontFamily: this.editorFontFamily || undefined,
             columnSelection: this.columnSelectionMode,
             multiCursorModifier: 'alt',
             // Enable code completion features
@@ -13482,6 +13567,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const savedMinimap = this.getStateItem('codeEditor.minimap')
         if (savedMinimap !== null) {
             this.minimapEnabled = savedMinimap === '1'
+        }
+        const savedFontFamily = this.getStateItem('codeEditor.fontFamily')
+        if (savedFontFamily !== null) {
+            this.editorFontFamily = savedFontFamily
         }
         const savedFontSize = this.getStateItem('codeEditor.fontSize')
         if (savedFontSize) {
