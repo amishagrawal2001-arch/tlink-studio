@@ -8270,10 +8270,23 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private syncTopologyForActiveDoc (): void {
+        const doc = this.getActiveDoc()
+
+        // Auto-enter canvas mode when switching to a topology file.
+        if (!this.topologyCanvasMode && doc && this.isTopologyDocCandidate(doc)) {
+            this.topologyCanvasMode = true
+            this.loadTopologyFromDoc(doc)
+            this.layoutEditors()
+            this.cdr.markForCheck()
+            window.setTimeout(() => {
+                this.attachTopologyWheelListener()
+            }, 0)
+            return
+        }
+
         if (!this.topologyCanvasMode) {
             return
         }
-        const doc = this.getActiveDoc()
         if (!doc || !this.isTopologyDocCandidate(doc)) {
             this.topologyCanvasMode = false
             this.topologyData = null
@@ -11665,6 +11678,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             // prevents deleted files from reappearing if the app is
             // force-killed before a normal persistState fires.
             this.persistState()
+            // Auto-enter topology canvas if the active doc is a topology file.
+            this.syncTopologyForActiveDoc()
             if (this.pendingSplitDocId) {
                 this.restoreSplitView()
             }
