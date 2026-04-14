@@ -215,6 +215,11 @@
                         <li><i class="fas fa-check"></i> External conflict detection when files change on disk</li>
                         <li><i class="fas fa-check"></i> Auto-save and state recovery on restart</li>
                         <li><i class="fas fa-check"></i> Save-as dialog for untitled files on first save</li>
+                        <li><i class="fas fa-check"></i> Format menu: font family, weight, letter spacing, cursor style, bracket colorization, whitespace rendering</li>
+                        <li><i class="fas fa-check"></i> Tools menu: recent files, diff vs disk, diff with other documents</li>
+                        <li><i class="fas fa-check"></i> Font family picker with 10 monospace fonts (Source Code Pro, Menlo, Consolas, etc.)</li>
+                        <li><i class="fas fa-check"></i> Format YAML alongside JSON in Edit menu</li>
+                        <li><i class="fas fa-check"></i> Right-click: Change All Occurrences, toggle line/column selection mode</li>
                         <li><i class="fas fa-check"></i> Responsive flex-wrap toolbar with theme &amp; palette controls</li>
                         <li><i class="fas fa-check"></i> Run code in integrated terminal</li>
                     </ul>
@@ -340,6 +345,21 @@
                     <h3>Interactive Editing</h3>
                     <p>Click to select, drag to move, multi-select with marquee. Crosshair cursor in link mode. Smooth trackpad pinch-to-zoom. Rich right-click context menus for nodes, shapes, and links.</p>
                 </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-font"></i></div>
+                    <h3>Text Formatting</h3>
+                    <p>Bold, italic, underline, strikethrough, text shadow, font size, and text alignment for labels and sticky notes. Full inspector panel.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-magic"></i></div>
+                    <h3>Auto Canvas Mode</h3>
+                    <p>Topology files automatically open in canvas view instead of raw JSON. Toggle back to text editor anytime via the toolbar button.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-eraser"></i></div>
+                    <h3>Clear &amp; Select All</h3>
+                    <p>Right-click empty canvas to clear all items (with undo) or select everything. Quick actions for managing large diagrams.</p>
+                </div>
             </div>
 
             <!-- Topology Screenshots -->
@@ -381,11 +401,16 @@
                     <tr><td>Quick open</td><td>Cmd+P</td><td>Ctrl+P</td></tr>
                     <tr><td>Undo</td><td>Cmd+Z</td><td>Ctrl+Z</td></tr>
                     <tr><td>Redo</td><td>Cmd+Shift+Z</td><td>Ctrl+Shift+Z</td></tr>
+                    <tr><td>Change All Occurrences</td><td>Cmd+F2</td><td>Ctrl+F2</td></tr>
                     <tr><td>Toggle word wrap</td><td colspan="2">Via toolbar Wrap button</td></tr>
+                    <tr><td>Selection mode toggle</td><td colspan="2">Right-click &rarr; Selection: Line/Column</td></tr>
+                    <tr><td>Format menu</td><td colspan="2">Toolbar &rarr; Format (font, cursor, whitespace, etc.)</td></tr>
+                    <tr><td>Tools menu</td><td colspan="2">Toolbar &rarr; Tools (recent files, diff)</td></tr>
                     <tr><td>Topology: Undo</td><td>Cmd+Z</td><td>Ctrl+Z</td></tr>
                     <tr><td>Topology: Redo</td><td>Cmd+Shift+Z</td><td>Ctrl+Shift+Z</td></tr>
                     <tr><td>Topology: Zoom</td><td colspan="2">Pinch trackpad or Ctrl+Scroll</td></tr>
                     <tr><td>Topology: Pan</td><td colspan="2">Scroll wheel or drag empty canvas</td></tr>
+                    <tr><td>Topology: Clear canvas</td><td colspan="2">Right-click empty canvas &rarr; Clear canvas</td></tr>
                 </table>
             </div>
         </div>
