@@ -11217,6 +11217,116 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    async openSampleFile (kind: 'json'|'yaml'|'topology'): Promise<void> {
+        if (!(await this.ensureEditor())) {
+            return
+        }
+        let name: string
+        let content: string
+        switch (kind) {
+        case 'json':
+            name = 'sample.json'
+            content = JSON.stringify({
+                name: 'Tlink Studio',
+                version: '1.0.0',
+                description: 'A code editor and terminal IDE with topology diagrams',
+                features: ['Monaco Editor', 'Integrated Terminal', 'Topology Canvas', 'Git Status'],
+                settings: {
+                    theme: 'dark',
+                    fontSize: 14,
+                    wordWrap: true,
+                    autosave: true,
+                },
+                dependencies: {
+                    electron: '38',
+                    angular: '15',
+                    monaco: '0.45',
+                    xterm: '6.0',
+                },
+            }, null, 2)
+            break
+        case 'yaml':
+            name = 'sample.yaml'
+            content = [
+                '# Tlink Studio Configuration',
+                'name: Tlink Studio',
+                'version: 1.0.0',
+                'description: A code editor and terminal IDE with topology diagrams',
+                '',
+                'features:',
+                '  - Monaco Editor',
+                '  - Integrated Terminal',
+                '  - Topology Canvas',
+                '  - Git Status Indicators',
+                '  - Diagnostics Panel',
+                '',
+                'editor:',
+                '  theme: dark',
+                '  fontSize: 14',
+                '  wordWrap: true',
+                '  autosave: true',
+                '  fontFamily: Source Code Pro',
+                '',
+                'topology:',
+                '  snapToGrid: true',
+                '  curvedLinks: false',
+                '  defaultNodeColor: "#2563eb"',
+                '  defaultLinkColor: "#64748b"',
+                '',
+                'terminal:',
+                '  shell: default',
+                '  fontSize: 13',
+                '  cursorStyle: block',
+            ].join('\n')
+            break
+        case 'topology':
+            name = 'sample.topology.json'
+            content = JSON.stringify({
+                type: 'tlink-topology',
+                nodes: [
+                    { id: 'router-1', label: 'Core Router', x: 300, y: 100, kind: 'router', color: '#2563eb' },
+                    { id: 'switch-1', label: 'Switch A', x: 150, y: 250, kind: 'switch', color: '#0ea5e9' },
+                    { id: 'switch-2', label: 'Switch B', x: 450, y: 250, kind: 'switch', color: '#0ea5e9' },
+                    { id: 'host-1', label: 'Server 1', x: 80, y: 400, kind: 'host', color: '#10b981' },
+                    { id: 'host-2', label: 'Server 2', x: 220, y: 400, kind: 'host', color: '#10b981' },
+                    { id: 'host-3', label: 'Server 3', x: 380, y: 400, kind: 'host', color: '#10b981' },
+                    { id: 'host-4', label: 'Server 4', x: 520, y: 400, kind: 'host', color: '#10b981' },
+                ],
+                links: [
+                    { id: 'link-1', from: 'router-1', to: 'switch-1', fromKind: 'node', toKind: 'node', directed: true, label: '10G' },
+                    { id: 'link-2', from: 'router-1', to: 'switch-2', fromKind: 'node', toKind: 'node', directed: true, label: '10G' },
+                    { id: 'link-3', from: 'switch-1', to: 'host-1', fromKind: 'node', toKind: 'node', directed: false },
+                    { id: 'link-4', from: 'switch-1', to: 'host-2', fromKind: 'node', toKind: 'node', directed: false },
+                    { id: 'link-5', from: 'switch-2', to: 'host-3', fromKind: 'node', toKind: 'node', directed: false },
+                    { id: 'link-6', from: 'switch-2', to: 'host-4', fromKind: 'node', toKind: 'node', directed: false },
+                ],
+                shapes: [],
+                texts: [
+                    { id: 'text-1', text: 'Sample Network Topology', x: 200, y: 30, fontSize: 18, fontWeight: 'bold' },
+                ],
+                metadata: { createdAt: new Date().toISOString() },
+            }, null, 2)
+            break
+        default:
+            return
+        }
+        try {
+            const targetFolder = this.getAutosaveTargetFolder()
+            const targetPath = await this.ensureUniquePath(targetFolder, name)
+            const fs = (window as any).require?.('fs/promises')
+            if (fs) {
+                await fs.mkdir(targetFolder, { recursive: true })
+                await fs.writeFile(targetPath, content, 'utf8')
+            }
+            this.openDocumentFromContent(path.basename(targetPath), targetPath, content)
+            this.updateTreeItems()
+            this.persistState()
+            this.cdr.markForCheck()
+        } catch (err: any) {
+            this.setError(`Failed to create sample file: ${err?.message ?? err}`)
+        }
+    }
+
     openRecentFile (filePath: string): void {
         this.toolsMenuOpen = false
         this.toolsSubMenu = null

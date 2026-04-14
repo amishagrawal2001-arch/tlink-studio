@@ -70,6 +70,16 @@
                     button(type='button', (click)='viewMenuOpen=false; toggleHelp()')
                         i.fas.fa-question-circle(style='margin-right: 6px;')
                         | Help
+                    .dropdown-section-label Sample Files
+                    button(type='button', (click)='viewMenuOpen=false; openSampleFile("json")')
+                        i.fas.fa-file-code(style='margin-right: 6px;')
+                        | Sample JSON
+                    button(type='button', (click)='viewMenuOpen=false; openSampleFile("yaml")')
+                        i.fas.fa-file-alt(style='margin-right: 6px;')
+                        | Sample YAML
+                    button(type='button', (click)='viewMenuOpen=false; openSampleFile("topology")')
+                        i.fas.fa-project-diagram(style='margin-right: 6px;')
+                        | Sample Topology
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
                 .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
