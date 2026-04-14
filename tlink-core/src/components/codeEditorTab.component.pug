@@ -327,18 +327,46 @@
 
                 .help-section
                     .help-section-title
-                        i.fas.fa-columns
-                        |  Diff Controls
+                        i.fas.fa-sliders-h
+                        |  Format Menu
                     ul.help-list
                         li
-                            strong Diff with...
-                            |  — Select another open file to compare against
+                            strong Font Family
+                            |  — Choose from 10 monospace fonts: Source Code Pro, Menlo, Consolas, Courier New, JetBrains Mono, Fira Code, and more
                         li
-                            strong Diff
-                            |  — Start the diff comparison
+                            strong Font Weight
+                            |  — Normal or Bold editor text
+                        li
+                            strong Letter Spacing
+                            |  — Default (0), Wide (1px), or Extra wide (2px)
+                        li
+                            strong Cursor Style & Animation
+                            |  — Line/Block/Underline cursor with Blink/Smooth/Solid animation
+                        li
+                            strong Bracket Colorization
+                            |  — Toggle colored bracket pairs on/off
+                        li
+                            strong Render Whitespace
+                            |  — None, Boundary, or All whitespace characters visible
+                        li
+                            strong Smooth Scrolling & Line Numbers
+                            |  — Toggle smooth scroll, switch between Absolute/Relative/Off line numbers
+                        li Click a menu item to open its submenu to the right. All settings persist across sessions.
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-wrench
+                        |  Tools Menu
+                    ul.help-list
+                        li
+                            strong Recent Files
+                            |  — Click to reopen any recently accessed file
                         li
                             strong Diff vs Disk
                             |  — Compare current edits with the saved version on disk
+                        li
+                            strong Diff with Document
+                            |  — Select another open file for side-by-side comparison
                         li
                             strong Exit Diff
                             |  — Return to normal editing mode
@@ -462,6 +490,48 @@
                         li
                             strong Undo / Redo
                             |  — Revert or reapply topology changes (120-entry history)
+                        li
+                            strong Text Formatting
+                            |  — Bold, italic, underline, strikethrough, text shadow, font size (8–48px), and alignment (left/center/right) for text labels and sticky notes via the inspector panel
+                        li
+                            strong Auto Canvas Mode
+                            |  — Topology files (.topology.json) automatically open in canvas view. Toggle back to text editor via the toolbar button
+                        li
+                            strong Clear Canvas / Select All
+                            |  — Right-click empty canvas to clear all items (with undo support) or select everything
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-terminal
+                        |  Integrated Terminal
+                    ul.help-list
+                        li
+                            strong Open Terminal
+                            |  — Launch a local shell from Edit menu or Ctrl+` shortcut
+                        li
+                            strong Send to Terminal / Run in Terminal
+                            |  — Send selected text or run the active file directly in the terminal
+                        li
+                            strong Split Panes
+                            |  — Multiple terminal instances side by side
+                        li
+                            strong Shell Support
+                            |  — PowerShell, Bash, Zsh, Fish, and other local shells
+                        li
+                            strong Search
+                            |  — Search within terminal output
+
+                .help-section
+                    .help-section-title
+                        i.fas.fa-window-restore
+                        |  Multi-Window
+                    ul.help-list
+                        li
+                            strong New Window
+                            |  — Open additional editor windows. Each window runs independently
+                        li
+                            strong Theme Sync
+                            |  — Theme and palette settings are shared across all windows
 
                 .help-section
                     .help-section-title
@@ -546,6 +616,12 @@
                                 | +
                                 kbd \\
                             span Toggle split view
+                        .help-shortcut-row
+                            .help-keys
+                                kbd {{modKey}}
+                                | +
+                                kbd F2
+                            span Change All Occurrences
                         .help-shortcut-row
                             .help-keys
                                 kbd Ctrl
