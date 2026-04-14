@@ -80,6 +80,9 @@
                     button(type='button', (click)='viewMenuOpen=false; openSampleFile("topology")')
                         i.fas.fa-project-diagram(style='margin-right: 6px;')
                         | Sample Topology
+                    button(type='button', (click)='viewMenuOpen=false; openSampleFile("python")')
+                        i.fab.fa-python(style='margin-right: 6px;')
+                        | Sample Python
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
                 .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
@@ -400,6 +403,9 @@
                         li
                             strong Sample Topology
                             |  — Create a sample network topology diagram with routers, switches, servers, and links. Opens automatically in canvas mode
+                        li
+                            strong Sample Python
+                            |  — Create a network scanner script with subnet scanning, port checking, hostname resolution, and JSON report generation
 
                 .help-section
                     .help-section-title
