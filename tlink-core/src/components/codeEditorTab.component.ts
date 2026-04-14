@@ -8283,13 +8283,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const doc = this.getActiveDoc()
 
         // Auto-enter canvas mode when switching to a topology file.
+        // Defer loading to next tick so Angular renders the canvas element first.
         if (!this.topologyCanvasMode && doc && this.isTopologyDocCandidate(doc)) {
             this.topologyCanvasMode = true
-            this.loadTopologyFromDoc(doc)
-            this.layoutEditors()
-            this.cdr.markForCheck()
+            this.cdr.detectChanges()
             window.setTimeout(() => {
-                this.attachTopologyWheelListener()
+                const activeDoc = this.getActiveDoc()
+                if (activeDoc && this.topologyCanvasMode && this.isTopologyDocCandidate(activeDoc)) {
+                    this.loadTopologyFromDoc(activeDoc)
+                    this.layoutEditors()
+                    this.attachTopologyWheelListener()
+                    this.cdr.detectChanges()
+                }
             }, 0)
             return
         }
