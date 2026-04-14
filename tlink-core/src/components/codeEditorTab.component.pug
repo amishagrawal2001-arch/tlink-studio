@@ -354,6 +354,36 @@
 
                 .help-section
                     .help-section-title
+                        i.fas.fa-eye
+                        |  View Menu
+                    ul.help-list
+                        li
+                            strong Terminal
+                            |  — Open a new integrated terminal tab (also Ctrl+`)
+                        li
+                            strong Split View
+                            |  — Toggle side-by-side editor for viewing two locations in the same file
+                        li
+                            strong Show/Hide Sidebar
+                            |  — Collapse or expand the file pane to maximize editor space
+                        li
+                            strong Wrap On/Off
+                            |  — Toggle word wrap (on by default)
+                        li
+                            strong Show/Hide Minimap
+                            |  — Toggle the code minimap on the right edge of the editor
+                        li
+                            strong Autosave On/Off
+                            |  — Toggle automatic file saving at regular intervals
+                        li
+                            strong Show/Hide Diagnostics
+                            |  — Toggle the diagnostics panel showing errors and warnings
+                        li
+                            strong Help
+                            |  — Open this help overlay
+
+                .help-section
+                    .help-section-title
                         i.fas.fa-sliders-h
                         |  Format Menu
                     ul.help-list
@@ -415,15 +445,19 @@
                         i.fas.fa-stethoscope
                         |  Diagnostics
                     ul.help-list
+                        li Diagnostics shows real-time code errors and warnings detected by Monaco's language services — similar to the Problems panel in VS Code. Most useful for JSON, TypeScript, and JavaScript files. Toggle via View menu or toolbar button.
                         li
                             strong Problems Tab
-                            |  — Live error and warning markers from Monaco language services. Click any marker to jump to its location
+                            |  — Live error and warning markers with severity (error, warning, info). Shows message, source, line number, and column. Click any marker to jump directly to that location in the editor
                         li
                             strong File Info Tab
-                            |  — Shows language, line count, character count, workspace root, and loaded plugins
+                            |  — Shows file metadata: detected language, total line count, character count, workspace root path, and loaded plugins
                         li
                             strong Badge Indicators
-                            |  — Red badge for error count, orange badge for warning count on the toolbar button
+                            |  — Red badge on toolbar button shows error count, orange badge for warning count. Badges update in real-time as you edit
+                        li
+                            strong Supported Languages
+                            |  — JSON (syntax validation), TypeScript/JavaScript (type checking, syntax), HTML, CSS, and other languages with Monaco built-in validation
 
                 .help-section
                     .help-section-title
