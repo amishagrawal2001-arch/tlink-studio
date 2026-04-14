@@ -43,6 +43,33 @@
                     button(type='button', (click)='handleEditAction("openClipboard")') Open clipboard
                     button(type='button', (click)='handleEditAction("wrap")') {{wordWrapEnabled ? 'Wrap off' : 'Wrap on'}}
                     button(type='button', (click)='handleEditAction("minimap")') {{minimapEnabled ? 'Hide minimap' : 'Show minimap'}}
+            .menu-container.left-menu((mouseenter)='openViewMenuOnHover()', (mouseleave)='closeViewMenuOnLeave()')
+                button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleViewMenu($event)', title='View options') View
+                .dropdown-menu(*ngIf='viewMenuOpen', (mouseenter)='keepViewMenuOpenOnHover()', (mouseleave)='closeViewMenuOnLeave()', (click)='$event.stopPropagation()')
+                    button(type='button', (click)='viewMenuOpen=false; openTerminalInNewTab()')
+                        i.fas.fa-terminal(style='margin-right: 6px;')
+                        | Terminal
+                    button(type='button', (click)='viewMenuOpen=false; toggleSplitView()', [disabled]='viewMode==="diff"')
+                        i.fas.fa-columns(style='margin-right: 6px;')
+                        | {{splitEditor ? 'Close Split' : 'Split View'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleSidebarCollapsed()')
+                        i.fas(style='margin-right: 6px;', [ngClass]='sidebarCollapsed ? "fa-eye" : "fa-eye-slash"')
+                        | {{sidebarCollapsed ? 'Show Sidebar' : 'Hide Sidebar'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleWordWrap()')
+                        i.fas.fa-text-width(style='margin-right: 6px;')
+                        | {{wordWrapEnabled ? 'Wrap Off' : 'Wrap On'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleMinimap()')
+                        i.fas.fa-map(style='margin-right: 6px;')
+                        | {{minimapEnabled ? 'Hide Minimap' : 'Show Minimap'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleAutosave()')
+                        i.fas.fa-save(style='margin-right: 6px;')
+                        | {{autosaveEnabled ? 'Autosave Off' : 'Autosave On'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleDiagnostics()')
+                        i.fas.fa-stethoscope(style='margin-right: 6px;')
+                        | {{showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleHelp()')
+                        i.fas.fa-question-circle(style='margin-right: 6px;')
+                        | Help
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
                 .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')

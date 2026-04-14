@@ -345,6 +345,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     formatSubMenu: string|null = null
     toolsMenuOpen = false
     toolsSubMenu: string|null = null
+    viewMenuOpen = false
     showDiagnostics = false
 
     // Editor rendering options
@@ -9694,6 +9695,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.formatSubMenu = null
         this.toolsMenuOpen = false
         this.toolsSubMenu = null
+        this.viewMenuOpen = false
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11130,16 +11132,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.editMenuOpen = false
         this.formatMenuOpen = false
         this.formatSubMenu = null
+        this.viewMenuOpen = false
         this.toolsMenuOpen = !this.toolsMenuOpen
     }
 
     openToolsMenuOnHover (): void {
         this.cancelToolsMenuClose()
-        if (this.fileMenuOpen || this.editMenuOpen || this.formatMenuOpen) {
+        if (this.fileMenuOpen || this.editMenuOpen || this.formatMenuOpen || this.viewMenuOpen) {
             this.fileMenuOpen = false
             this.editMenuOpen = false
             this.formatMenuOpen = false
             this.formatSubMenu = null
+            this.viewMenuOpen = false
             this.toolsMenuOpen = true
         }
     }
@@ -11163,6 +11167,53 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (this.toolsMenuHoverCloseTimer) {
             clearTimeout(this.toolsMenuHoverCloseTimer)
             this.toolsMenuHoverCloseTimer = undefined
+        }
+    }
+
+    private viewMenuHoverCloseTimer?: number
+
+    toggleViewMenu (event?: MouseEvent): void {
+        event?.stopPropagation()
+        this.fileMenuOpen = false
+        this.editMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
+        this.toolsMenuOpen = false
+        this.toolsSubMenu = null
+        this.viewMenuOpen = !this.viewMenuOpen
+    }
+
+    openViewMenuOnHover (): void {
+        this.cancelViewMenuClose()
+        if (this.fileMenuOpen || this.editMenuOpen || this.formatMenuOpen || this.toolsMenuOpen) {
+            this.fileMenuOpen = false
+            this.editMenuOpen = false
+            this.formatMenuOpen = false
+            this.formatSubMenu = null
+            this.toolsMenuOpen = false
+            this.toolsSubMenu = null
+            this.viewMenuOpen = true
+        }
+    }
+
+    keepViewMenuOpenOnHover (): void {
+        this.cancelViewMenuClose()
+        this.viewMenuOpen = true
+    }
+
+    closeViewMenuOnLeave (): void {
+        this.cancelViewMenuClose()
+        this.viewMenuHoverCloseTimer = window.setTimeout(() => {
+            this.viewMenuHoverCloseTimer = undefined
+            this.viewMenuOpen = false
+            this.cdr.markForCheck()
+        }, this.menuHoverCloseDelayMs)
+    }
+
+    private cancelViewMenuClose (): void {
+        if (this.viewMenuHoverCloseTimer) {
+            clearTimeout(this.viewMenuHoverCloseTimer)
+            this.viewMenuHoverCloseTimer = undefined
         }
     }
 
