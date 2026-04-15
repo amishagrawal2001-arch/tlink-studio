@@ -5414,7 +5414,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyContextMenuX = Math.max(padding, Math.min(event.clientX, maxX))
         this.topologyContextMenuY = Math.max(padding, Math.min(event.clientY, maxY))
         this.topologyContextMenuOpen = true
-        this.cdr.markForCheck()
+        this.cdr.detectChanges()
     }
 
     onTopologyNodeContextMenu (event: MouseEvent, nodeId: string): void {
@@ -5443,7 +5443,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.topologyNodeContextMenuX = Math.max(padding, Math.min(event.clientX, maxX))
         this.topologyNodeContextMenuY = Math.max(padding, Math.min(event.clientY, maxY))
         this.topologyNodeContextMenuOpen = true
-        this.cdr.markForCheck()
+        this.cdr.detectChanges()
     }
 
     private closeNodeContextMenu (): void {
@@ -14560,7 +14560,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         // Don't close menus when clicking inside them.
         // Note: this also protects against capture-phase document listeners closing the menu
         // before the menu item's click handler runs.
-        if (target?.closest?.('.doc-context-menu') || target?.closest?.('.menu-container')) {
+        if (target?.closest?.('.doc-context-menu') || target?.closest?.('.menu-container') || target?.closest?.('.topology-context-menu')) {
             return
         }
         // Clear folder selection when clicking anywhere outside actual tree rows,
@@ -14593,8 +14593,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     @HostListener('document:contextmenu', ['$event'])
     closeContextMenusOnRightClick (event?: MouseEvent): void {
         const target = (event?.target ?? null) as any
-        // Don't close if right-clicking on a menu or menu trigger
-        if (target?.closest?.('.doc-context-menu') || target?.closest?.('.menu-container') || target?.closest?.('.tree-row')) {
+        // Don't close if right-clicking on a menu, menu trigger, or topology canvas
+        if (target?.closest?.('.doc-context-menu') || target?.closest?.('.menu-container') || target?.closest?.('.tree-row') || target?.closest?.('.topology-canvas')) {
             return
         }
         // Close all context menus when right-clicking elsewhere
