@@ -668,8 +668,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private readonly skippedFolders = new Set(['.git', 'node_modules', '.svn', '.hg', '.idea', '.vscode', 'dist', 'build'])
     private readonly studioTitle = 'Tlink Studio'
     private readonly simpleDiskMode = true
-    private readonly topologyNodeWidthPx = 120
-    private readonly topologyNodeHeightPx = 52
+    private readonly topologyNodeWidthPx = 100
+    private readonly topologyNodeHeightPx = 50
     private readonly topologyStickyDefaultWidthPx = 350
     private readonly topologyStickyDefaultHeightPx = 150
     private readonly topologyStickyCollapsedHeightPx = 34
@@ -4193,7 +4193,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return this.topologyStickyCollapsedHeightPx
         }
         const widthRaw = Number(item.width)
-        const width = Number.isFinite(widthRaw) ? Math.max(100, widthRaw) : 120
+        const width = Number.isFinite(widthRaw) ? Math.max(100, widthRaw) : 100
         const autoHeight = this.getTopologyStickyContentHeight(item.text, width)
         const heightRaw = Number(item.height)
         if (!Number.isFinite(heightRaw)) {
@@ -4879,8 +4879,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const allX: number[] = []
         const allY: number[] = []
         for (const n of nodes) {
-            allX.push(n.x, n.x + (n.width || 120))
-            allY.push(n.y, n.y + (n.height || 52))
+            allX.push(n.x, n.x + (n.width || 100))
+            allY.push(n.y, n.y + (n.height || 50))
         }
         for (const s of shapes) {
             allX.push(s.x, s.x + s.width)
@@ -4932,7 +4932,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 if (s) return { x: s.x + s.width / 2 + offsetX, y: s.y + s.height / 2 + offsetY }
             }
             const n = nodes.find(n => n.id === id)
-            if (n) return { x: n.x + (n.width || 120) / 2 + offsetX, y: n.y + (n.height || 52) / 2 + offsetY }
+            if (n) return { x: n.x + (n.width || 100) / 2 + offsetX, y: n.y + (n.height || 50) / 2 + offsetY }
             return null
         }
 
@@ -5000,7 +5000,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         for (const node of nodes) {
             const nx = node.x + offsetX
             const ny = node.y + offsetY
-            const nw = node.width || 120
+            const nw = node.width || 100
             const nh = node.height || 72
             const nodeColor = node.color || '#8b5cf6'
             // Node box
