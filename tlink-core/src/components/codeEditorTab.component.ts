@@ -350,6 +350,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     themeSubMenu: string|null = null
     showDiagnostics = false
 
+    // Multi-file search
+    showGlobalSearch = false
+    globalSearchQuery = ''
+    globalSearchResults: Array<{ docId: string, docName: string, line: number, column: number, text: string, matchStart: number, matchEnd: number }> = []
+    globalSearchResultCount = 0
+
     // Editor rendering options
     editorFontWeight = 'normal'
     editorLetterSpacing = 0
@@ -6582,7 +6588,34 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
         this.topologyNodeClipboard = { nodes, shapes, texts, links }
         this.topologyNodePasteSerial = 0
+        // Also write to system clipboard for cross-file paste.
+        try {
+            const clipboardData = JSON.stringify({ __tlink_topology_clipboard: true, nodes, shapes, texts, links })
+            void navigator.clipboard.writeText(clipboardData)
+        } catch { /* best effort */ }
         return true
+    }
+
+    async pasteTopologyFromSystemClipboard (): Promise<boolean> {
+        if (!this.topologyData) {
+            return false
+        }
+        try {
+            const text = await navigator.clipboard.readText()
+            if (text?.includes('__tlink_topology_clipboard')) {
+                const parsed = JSON.parse(text)
+                if (parsed?.__tlink_topology_clipboard) {
+                    this.topologyNodeClipboard = {
+                        nodes: parsed.nodes ?? [],
+                        shapes: parsed.shapes ?? [],
+                        texts: parsed.texts ?? [],
+                        links: parsed.links ?? [],
+                    }
+                    this.topologyNodePasteSerial = 0
+                }
+            }
+        } catch { /* system clipboard not available or no topology data */ }
+        return this.pasteTopologyNodesFromClipboard()
     }
 
     private pasteTopologyNodesFromClipboard (): boolean {
@@ -10025,7 +10058,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     async pasteClipboard (): Promise<void> {
         if (this.topologyCanvasMode) {
-            this.pasteTopologyNodesFromClipboard()
+            await this.pasteTopologyFromSystemClipboard()
             return
         }
         if (!(await this.ensureEditor())) {
@@ -11545,6 +11578,62 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    toggleGlobalSearch (): void {
+        this.showGlobalSearch = !this.showGlobalSearch
+        if (!this.showGlobalSearch) {
+            this.globalSearchResults = []
+            this.globalSearchResultCount = 0
+        }
+        this.cdr.markForCheck()
+    }
+
+    runGlobalSearch (query: string): void {
+        this.globalSearchQuery = query
+        this.globalSearchResults = []
+        this.globalSearchResultCount = 0
+        if (!query || query.length < 2) {
+            this.cdr.markForCheck()
+            return
+        }
+        const maxResults = 200
+        let count = 0
+        for (const doc of this.documents) {
+            if (count >= maxResults) { break }
+            if (!this.isModelAlive(doc)) { continue }
+            const matches = doc.model.findMatches(query, true, false, false, null, false, maxResults - count)
+            for (const match of matches) {
+                if (count >= maxResults) { break }
+                const lineContent = doc.model.getLineContent(match.range.startLineNumber)
+                this.globalSearchResults.push({
+                    docId: doc.id,
+                    docName: doc.name,
+                    line: match.range.startLineNumber,
+                    column: match.range.startColumn,
+                    text: lineContent.length > 120 ? lineContent.substring(0, 120) + '…' : lineContent,
+                    matchStart: match.range.startColumn - 1,
+                    matchEnd: match.range.endColumn - 1,
+                })
+                count++
+            }
+        }
+        this.globalSearchResultCount = count
+        this.cdr.markForCheck()
+    }
+
+    goToGlobalSearchResult (result: any): void {
+        const doc = this.documents.find(d => d.id === result.docId)
+        if (!doc) { return }
+        this.activateDoc(doc.id)
+        window.setTimeout(() => {
+            const editor = this.getActiveEditor()
+            if (editor) {
+                editor.setPosition({ lineNumber: result.line, column: result.column })
+                editor.revealLineInCenter(result.line)
+                editor.focus()
+            }
+        }, 50)
+    }
+
     openRecentFile (filePath: string): void {
         this.toolsMenuOpen = false
         this.toolsSubMenu = null
@@ -13052,9 +13141,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 return
             }
             if (ctrlOrMeta && !event.shiftKey && key === 'v') {
-                if (this.pasteTopologyNodesFromClipboard()) {
-                    event.preventDefault()
-                }
+                event.preventDefault()
+                void this.pasteTopologyFromSystemClipboard().then(ok => {
+                    if (ok) { this.cdr.markForCheck() }
+                })
                 return
             }
             if (ctrlOrMeta && !event.shiftKey && key === 'd') {

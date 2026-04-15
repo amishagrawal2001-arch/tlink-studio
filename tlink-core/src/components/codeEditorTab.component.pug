@@ -67,6 +67,9 @@
                     button(type='button', (click)='viewMenuOpen=false; toggleDiagnostics()')
                         i.fas.fa-stethoscope(style='margin-right: 6px;')
                         | {{showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}}
+                    button(type='button', (click)='viewMenuOpen=false; toggleGlobalSearch()')
+                        i.fas.fa-search(style='margin-right: 6px;')
+                        | {{showGlobalSearch ? 'Hide Search in Files' : 'Search in Files'}}
                     button(type='button', (click)='viewMenuOpen=false; toggleHelp()')
                         i.fas.fa-question-circle(style='margin-right: 6px;')
                         | Help
@@ -780,6 +783,20 @@
                 button(*ngFor='let folder of folders', type='button', (click)='moveDocumentFromContextMenu(folder.path)') Move to {{folder.name}}
                 button(type='button', (click)='closeDocumentFromContextMenu()') Close
         .sidebar-resizer(*ngIf='!sidebarCollapsed', (mousedown)='beginSidebarResize($event)')
+        .global-search-panel(*ngIf='showGlobalSearch')
+            .global-search-header
+                input.form-control.form-control-sm.global-search-input(type='text', placeholder='Search in all open files…', [value]='globalSearchQuery', (input)='runGlobalSearch($event.target.value)', (keydown.escape)='toggleGlobalSearch()')
+                span.global-search-count {{globalSearchResultCount}} {{globalSearchResultCount === 1 ? 'result' : 'results'}}
+                button.btn.btn-sm.btn-link.global-search-close(type='button', (click)='toggleGlobalSearch()')
+                    i.fas.fa-times
+            .global-search-results
+                .global-search-result(*ngFor='let result of globalSearchResults', (click)='goToGlobalSearchResult(result)')
+                    .global-search-file
+                        i.fas.fa-file-code(style='margin-right: 4px; font-size: 10px;')
+                        | {{result.docName}}
+                        span.global-search-loc Ln {{result.line}}, Col {{result.column}}
+                    .global-search-line {{result.text}}
+                .global-search-empty(*ngIf='globalSearchQuery.length >= 2 && !globalSearchResults.length') No matches found
         .editor-main(dropZone, (transfer)='onExternalTransfer($event)')
             .external-conflict-banner(*ngIf='activeExternalConflictDoc as conflictDoc')
                 span.banner-text External changes detected for {{conflictDoc.name}}. Choose how to continue.
