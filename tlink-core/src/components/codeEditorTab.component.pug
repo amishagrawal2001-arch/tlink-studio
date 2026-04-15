@@ -177,24 +177,30 @@
                         .submenu-panel
                             button(*ngFor='let item of diffCandidates', type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; compareWithOtherDoc(item.id)') {{getDiffOptionLabel(item)}}
                             button(*ngIf='!diffCandidates.length', type='button', disabled) No other documents open
-            .toolbar-separator
-            label.font-control.theme-mode-control
-                span.small-label Theme
-                select.form-select.form-select-sm.theme-mode-select((change)='setThemeMode($event.target.value)', [value]='themeMode')
-                    option(value='auto') Auto
-                    option(value='light') Light
-                    option(value='dark') Dark
-                    option(value='hc') High contrast
-                    option(value='solarized-light') Solarized light
-                    option(value='solarized-dark') Solarized dark
-                    option(value='dracula') Dracula
-                    option(value='monokai') Monokai
-                    option(value='nord') Nord
-            label.font-control.theme-preset-control
-                span.small-label Palette
-                select.form-select.form-select-sm.theme-preset-select((change)='onEditorThemePresetChange($event.target.value)', [value]='editorThemePresetValue')
-                    option(value='custom') Custom
-                    option(*ngFor='let preset of editorThemePresets', [value]='preset.color') {{preset.name}}
+            .menu-container.left-menu((mouseenter)='openThemeMenuOnHover()', (mouseleave)='closeThemeMenuOnLeave()')
+                button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleThemeMenu($event)', title='Theme & Palette') Theme
+                .dropdown-menu.format-menu(*ngIf='themeMenuOpen', (mouseenter)='keepThemeMenuOpenOnHover()', (mouseleave)='closeThemeMenuOnLeave()', (click)='$event.stopPropagation()')
+                    .submenu-parent([class.open]='themeSubMenu==="mode"')
+                        button.submenu-trigger(type='button', (click)='themeSubMenu = themeSubMenu==="mode" ? null : "mode"') Theme Mode
+                            span.submenu-value {{themeMode}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel
+                            button(type='button', [class.active-item]='themeMode==="auto"', (click)='setThemeMode("auto"); themeMenuOpen=false; themeSubMenu=null') Auto
+                            button(type='button', [class.active-item]='themeMode==="light"', (click)='setThemeMode("light"); themeMenuOpen=false; themeSubMenu=null') Light
+                            button(type='button', [class.active-item]='themeMode==="dark"', (click)='setThemeMode("dark"); themeMenuOpen=false; themeSubMenu=null') Dark
+                            button(type='button', [class.active-item]='themeMode==="hc"', (click)='setThemeMode("hc"); themeMenuOpen=false; themeSubMenu=null') High Contrast
+                            button(type='button', [class.active-item]='themeMode==="solarized-light"', (click)='setThemeMode("solarized-light"); themeMenuOpen=false; themeSubMenu=null') Solarized Light
+                            button(type='button', [class.active-item]='themeMode==="solarized-dark"', (click)='setThemeMode("solarized-dark"); themeMenuOpen=false; themeSubMenu=null') Solarized Dark
+                            button(type='button', [class.active-item]='themeMode==="dracula"', (click)='setThemeMode("dracula"); themeMenuOpen=false; themeSubMenu=null') Dracula
+                            button(type='button', [class.active-item]='themeMode==="monokai"', (click)='setThemeMode("monokai"); themeMenuOpen=false; themeSubMenu=null') Monokai
+                            button(type='button', [class.active-item]='themeMode==="nord"', (click)='setThemeMode("nord"); themeMenuOpen=false; themeSubMenu=null') Nord
+                    .submenu-parent([class.open]='themeSubMenu==="palette"')
+                        button.submenu-trigger(type='button', (click)='themeSubMenu = themeSubMenu==="palette" ? null : "palette"') Palette
+                            span.submenu-value {{editorThemePresetValue === 'custom' ? 'Custom' : editorThemePresetValue}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel
+                            button(type='button', [class.active-item]='editorThemePresetValue==="custom"', (click)='onEditorThemePresetChange("custom"); themeMenuOpen=false; themeSubMenu=null') Custom
+                            button(*ngFor='let preset of editorThemePresets', type='button', [class.active-item]='editorThemePresetValue===preset.color', (click)='onEditorThemePresetChange(preset.color); themeMenuOpen=false; themeSubMenu=null') {{preset.name}}
         .toolbar-right
             button.btn.btn-sm.topology-mode-toggle(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.mode-canvas]='topologyCanvasMode', [class.mode-editor]='!topologyCanvasMode', [disabled]='viewMode==="diff"')
                 i.fas(style='margin-right: 5px;', [ngClass]='topologyCanvasMode ? "fa-code" : "fa-project-diagram"')

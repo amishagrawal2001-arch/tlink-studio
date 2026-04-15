@@ -346,6 +346,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     toolsMenuOpen = false
     toolsSubMenu: string|null = null
     viewMenuOpen = false
+    themeMenuOpen = false
+    themeSubMenu: string|null = null
     showDiagnostics = false
 
     // Editor rendering options
@@ -9701,6 +9703,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.toolsMenuOpen = false
         this.toolsSubMenu = null
         this.viewMenuOpen = false
+        this.themeMenuOpen = false
+        this.themeSubMenu = null
 
         this.docContextMenuOpen = true
         this.docContextMenuDocId = docId
@@ -11138,6 +11142,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.formatMenuOpen = false
         this.formatSubMenu = null
         this.viewMenuOpen = false
+        this.themeMenuOpen = false
+        this.themeSubMenu = null
         this.toolsMenuOpen = !this.toolsMenuOpen
     }
 
@@ -11486,6 +11492,56 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.cdr.markForCheck()
         } catch (err: any) {
             this.setError(`Failed to create sample file: ${err?.message ?? err}`)
+        }
+    }
+
+    private themeMenuHoverCloseTimer?: number
+
+    toggleThemeMenu (event?: MouseEvent): void {
+        event?.stopPropagation()
+        this.fileMenuOpen = false
+        this.editMenuOpen = false
+        this.viewMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
+        this.toolsMenuOpen = false
+        this.toolsSubMenu = null
+        this.themeMenuOpen = !this.themeMenuOpen
+    }
+
+    openThemeMenuOnHover (): void {
+        this.cancelThemeMenuClose()
+        if (this.fileMenuOpen || this.editMenuOpen || this.viewMenuOpen || this.formatMenuOpen || this.toolsMenuOpen) {
+            this.fileMenuOpen = false
+            this.editMenuOpen = false
+            this.viewMenuOpen = false
+            this.formatMenuOpen = false
+            this.formatSubMenu = null
+            this.toolsMenuOpen = false
+            this.toolsSubMenu = null
+            this.themeMenuOpen = true
+        }
+    }
+
+    keepThemeMenuOpenOnHover (): void {
+        this.cancelThemeMenuClose()
+        this.themeMenuOpen = true
+    }
+
+    closeThemeMenuOnLeave (): void {
+        this.cancelThemeMenuClose()
+        this.themeMenuHoverCloseTimer = window.setTimeout(() => {
+            this.themeMenuHoverCloseTimer = undefined
+            this.themeMenuOpen = false
+            this.themeSubMenu = null
+            this.cdr.markForCheck()
+        }, this.menuHoverCloseDelayMs)
+    }
+
+    private cancelThemeMenuClose (): void {
+        if (this.themeMenuHoverCloseTimer) {
+            clearTimeout(this.themeMenuHoverCloseTimer)
+            this.themeMenuHoverCloseTimer = undefined
         }
     }
 
