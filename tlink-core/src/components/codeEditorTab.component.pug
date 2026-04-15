@@ -177,6 +177,16 @@
                         .submenu-panel
                             button(*ngFor='let item of diffCandidates', type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; compareWithOtherDoc(item.id)') {{getDiffOptionLabel(item)}}
                             button(*ngIf='!diffCandidates.length', type='button', disabled) No other documents open
+                    .submenu-parent([class.open]='toolsSubMenu==="diagnostics"')
+                        button.submenu-trigger(type='button', (click)='toolsSubMenu = toolsSubMenu==="diagnostics" ? null : "diagnostics"') Diagnostics
+                            span.submenu-value(style='display:inline-flex;gap:4px')
+                                span.diag-badge.badge-error(*ngIf='diagnosticsMarkerSummary.errors > 0') {{diagnosticsMarkerSummary.errors}}
+                                span.diag-badge.badge-warning(*ngIf='diagnosticsMarkerSummary.warnings > 0') {{diagnosticsMarkerSummary.warnings}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel
+                            button(type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; toggleDiagnostics()', [class.active-item]='showDiagnostics') {{showDiagnostics ? 'Hide Panel' : 'Show Panel'}}
+                            button(type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; setDiagnosticsTab("markers"); showDiagnostics=true') Problems
+                            button(type='button', (click)='toolsMenuOpen=false; toolsSubMenu=null; setDiagnosticsTab("info"); showDiagnostics=true') File Info
             .menu-container.left-menu((mouseenter)='openThemeMenuOnHover()', (mouseleave)='closeThemeMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleThemeMenu($event)', title='Theme & Palette') Theme
                 .dropdown-menu.format-menu(*ngIf='themeMenuOpen', (mouseenter)='keepThemeMenuOpenOnHover()', (mouseleave)='closeThemeMenuOnLeave()', (click)='$event.stopPropagation()')
@@ -207,16 +217,13 @@
                 | {{topologyCanvasMode ? 'Text editor' : 'Topology canvas'}}
             .toolbar-separator
             .menu-container
-                button.btn.btn-sm.btn-outline-secondary.diagnostics-toggle(type='button', (click)='toggleDiagnostics($event)', [class.active]='showDiagnostics')
-                    | Diagnostics
-                    span.diag-badge.badge-error(*ngIf='diagnosticsMarkerSummary.errors > 0') {{diagnosticsMarkerSummary.errors}}
-                    span.diag-badge.badge-warning(*ngIf='diagnosticsMarkerSummary.warnings > 0') {{diagnosticsMarkerSummary.warnings}}
                 .dropdown-menu.diagnostics-panel(*ngIf='showDiagnostics', (click)='$event.stopPropagation()')
                     .diag-tabs
                         button.diag-tab(type='button', [class.active]='diagnosticsTab === "markers"', (click)='setDiagnosticsTab("markers")')
                             | Problems
                             span.diag-tab-count(*ngIf='editorMarkers.length') {{editorMarkers.length}}
                         button.diag-tab(type='button', [class.active]='diagnosticsTab === "info"', (click)='setDiagnosticsTab("info")') File Info
+                        button.diag-tab.diag-close(type='button', (click)='toggleDiagnostics()') ×
                     .diag-content
                         .diag-markers(*ngIf='diagnosticsTab === "markers"')
                             .diag-empty(*ngIf='editorMarkers.length === 0')
