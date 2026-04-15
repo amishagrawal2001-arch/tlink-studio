@@ -1797,13 +1797,13 @@
 .topology-node {
     box-sizing: border-box;
     position: absolute;
-    width: 176px;
-    min-height: 56px;
-    height: 72px;
+    width: 120px;
+    min-height: 44px;
+    height: 52px;
     border: 1px solid var(--theme-bg-less);
     border: 1px solid color-mix(in srgb, var(--theme-bg-less) 65%, var(--topology-node-color, var(--theme-accent)) 35%);
-    border-radius: 10px;
-    padding: 10px 12px;
+    border-radius: 8px;
+    padding: 6px 8px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1843,7 +1843,7 @@
     }
 
     .node-title {
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
@@ -1851,7 +1851,7 @@
     }
 
     input.node-title.topology-inline-input {
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 600;
         line-height: 1.25;
         padding: 2px 6px;
@@ -1859,7 +1859,7 @@
     }
 
     .node-meta {
-        font-size: 11px;
+        font-size: 9px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--theme-fg-less);
@@ -1874,8 +1874,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     color: inherit;
     flex: 0 0 auto;
 

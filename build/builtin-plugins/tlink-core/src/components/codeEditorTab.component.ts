@@ -668,8 +668,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private readonly skippedFolders = new Set(['.git', 'node_modules', '.svn', '.hg', '.idea', '.vscode', 'dist', 'build'])
     private readonly studioTitle = 'Tlink Studio'
     private readonly simpleDiskMode = true
-    private readonly topologyNodeWidthPx = 176
-    private readonly topologyNodeHeightPx = 72
+    private readonly topologyNodeWidthPx = 120
+    private readonly topologyNodeHeightPx = 52
     private readonly topologyStickyDefaultWidthPx = 350
     private readonly topologyStickyDefaultHeightPx = 150
     private readonly topologyStickyCollapsedHeightPx = 34
@@ -4193,7 +4193,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return this.topologyStickyCollapsedHeightPx
         }
         const widthRaw = Number(item.width)
-        const width = Number.isFinite(widthRaw) ? Math.max(100, widthRaw) : 176
+        const width = Number.isFinite(widthRaw) ? Math.max(100, widthRaw) : 120
         const autoHeight = this.getTopologyStickyContentHeight(item.text, width)
         const heightRaw = Number(item.height)
         if (!Number.isFinite(heightRaw)) {
@@ -4879,8 +4879,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const allX: number[] = []
         const allY: number[] = []
         for (const n of nodes) {
-            allX.push(n.x, n.x + (n.width || 176))
-            allY.push(n.y, n.y + (n.height || 72))
+            allX.push(n.x, n.x + (n.width || 120))
+            allY.push(n.y, n.y + (n.height || 52))
         }
         for (const s of shapes) {
             allX.push(s.x, s.x + s.width)
@@ -4932,7 +4932,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 if (s) return { x: s.x + s.width / 2 + offsetX, y: s.y + s.height / 2 + offsetY }
             }
             const n = nodes.find(n => n.id === id)
-            if (n) return { x: n.x + (n.width || 176) / 2 + offsetX, y: n.y + (n.height || 72) / 2 + offsetY }
+            if (n) return { x: n.x + (n.width || 120) / 2 + offsetX, y: n.y + (n.height || 52) / 2 + offsetY }
             return null
         }
 
@@ -5000,7 +5000,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         for (const node of nodes) {
             const nx = node.x + offsetX
             const ny = node.y + offsetY
-            const nw = node.width || 176
+            const nw = node.width || 120
             const nh = node.height || 72
             const nodeColor = node.color || '#8b5cf6'
             // Node box
@@ -6865,9 +6865,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const viewport = this.getTopologyViewportWorldBounds()
         const dx = point.x - this.topologyNodeResizeStartX
         const dy = point.y - this.topologyNodeResizeStartY
-        const maxWidth = Math.max(80, viewport.maxX - node.x - 8)
+        const maxWidth = Math.max(60, viewport.maxX - node.x - 8)
         const maxHeight = Math.max(56, viewport.maxY - node.y - 8)
-        const nextWidth = Math.max(80, Math.min(560, Math.min(maxWidth, this.topologyNodeResizeStartWidth + dx)))
+        const nextWidth = Math.max(60, Math.min(560, Math.min(maxWidth, this.topologyNodeResizeStartWidth + dx)))
         const nextHeight = Math.max(56, Math.min(320, Math.min(maxHeight, this.topologyNodeResizeStartHeight + dy)))
         const normalizedWidth = Number(nextWidth.toFixed(2))
         const normalizedHeight = Number(nextHeight.toFixed(2))
@@ -7163,8 +7163,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const width = Number.isFinite(widthRaw) ? widthRaw : this.topologyNodeWidthPx
         const height = Number.isFinite(heightRaw) ? heightRaw : this.topologyNodeHeightPx
         return {
-            width: Math.max(80, Math.min(560, width)),
-            height: Math.max(56, Math.min(320, height)),
+            width: Math.max(60, Math.min(560, width)),
+            height: Math.max(40, Math.min(320, height)),
         }
     }
 
