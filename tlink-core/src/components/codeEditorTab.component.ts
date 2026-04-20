@@ -14594,15 +14594,40 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (this.simpleDiskMode) {
             this.autosaveEnabled = false
             this.setStateItem('codeEditor.autosave', '')
-            this.setStateItem('codeEditor.docs', '[]')
-            this.setStateItem('codeEditor.active', '')
-            this.setStateItem('codeEditor.split', '')
-            this.setStateItem('codeEditor.splitDoc', '')
             // In simple mode the tree must reflect disk exactly.
             // Clear persisted hidden paths so previously closed/hidden
             // files never disappear from the tree on restart.
             this.hiddenTreePathKeys = new Set()
             this.setStateItem('codeEditor.hiddenTreePaths', '[]')
+            // Restore previously open documents whose files still exist on disk.
+            // Untitled/temp-only docs are not restored — only saved files.
+            const rawSimple = this.getStateItem('codeEditor.docs')
+            const activeSimple = this.getStateItem('codeEditor.active') || null
+            if (rawSimple) {
+                try {
+                    const snaps: EditorDocumentSnapshot[] = JSON.parse(rawSimple)
+                    const MAX = 50
+                    let restored = 0
+                    for (const snap of snaps) {
+                        if (restored >= MAX) { break }
+                        if (!snap?.path) { continue }
+                        try {
+                            if (!fsSync.existsSync(snap.path)) { continue }
+                            const content = fsSync.readFileSync(snap.path, 'utf8')
+                            this.openDocumentFromContent(path.basename(snap.path), snap.path, content, false)
+                            restored++
+                        } catch { /* skip unreadable file */ }
+                    }
+                    // Reactivate the previously active doc if present.
+                    if (activeSimple) {
+                        const activeDoc = this.documents.find(d => d.path === activeSimple)
+                        if (activeDoc) {
+                            this.activeDocId = activeDoc.id
+                            this.refreshActiveDocCache()
+                        }
+                    }
+                } catch { /* best effort */ }
+            }
             return
         }
         const splitEnabled = this.getStateItem('codeEditor.split') === '1'
