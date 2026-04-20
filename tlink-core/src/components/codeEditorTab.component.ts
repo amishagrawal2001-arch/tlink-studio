@@ -11322,8 +11322,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     openEditMenuOnHover (): void {
         this.cancelEditMenuClose()
         this.cancelFileMenuClose()
-        this.editMenuOpen = true
-        this.fileMenuOpen = false
+        // Only switch on hover if another menu is already open.
+        if (this.fileMenuOpen || this.viewMenuOpen || this.formatMenuOpen || this.toolsMenuOpen || this.themeMenuOpen) {
+            this.fileMenuOpen = false
+            this.viewMenuOpen = false
+            this.formatMenuOpen = false
+            this.formatSubMenu = null
+            this.toolsMenuOpen = false
+            this.toolsSubMenu = null
+            this.themeMenuOpen = false
+            this.themeSubMenu = null
+            this.editMenuOpen = true
+        }
     }
 
     keepEditMenuOpenOnHover (): void {
@@ -11351,9 +11361,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     openFormatMenuOnHover (): void {
         this.cancelFormatMenuClose()
-        if (this.fileMenuOpen || this.editMenuOpen) {
+        if (this.fileMenuOpen || this.editMenuOpen || this.viewMenuOpen || this.toolsMenuOpen || this.themeMenuOpen) {
             this.fileMenuOpen = false
             this.editMenuOpen = false
+            this.viewMenuOpen = false
+            this.toolsMenuOpen = false
+            this.toolsSubMenu = null
+            this.themeMenuOpen = false
+            this.themeSubMenu = null
             this.formatMenuOpen = true
         }
     }
@@ -12061,8 +12076,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     openFileMenuOnHover (): void {
         this.cancelFileMenuClose()
         this.cancelEditMenuClose()
-        this.fileMenuOpen = true
-        this.editMenuOpen = false
+        // Only switch to this menu on hover if another menu is already open
+        // (native menu-bar behavior). Otherwise require a click to open.
+        if (this.editMenuOpen || this.viewMenuOpen || this.formatMenuOpen || this.toolsMenuOpen || this.themeMenuOpen) {
+            this.editMenuOpen = false
+            this.viewMenuOpen = false
+            this.formatMenuOpen = false
+            this.formatSubMenu = null
+            this.toolsMenuOpen = false
+            this.toolsSubMenu = null
+            this.themeMenuOpen = false
+            this.themeSubMenu = null
+            this.fileMenuOpen = true
+        }
     }
 
     keepFileMenuOpenOnHover (): void {
