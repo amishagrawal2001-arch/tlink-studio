@@ -14614,6 +14614,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                         try {
                             if (!fsSync.existsSync(snap.path)) { continue }
                             const content = fsSync.readFileSync(snap.path, 'utf8')
+                            // If the file lives outside any attached folder root,
+                            // attach its parent in scoped (opened-files-only) mode
+                            // so the file is visible in the tree.
+                            const insideAttached = this.folders.some(f => this.isTreePathEqualOrDescendant(snap.path!, f.path))
+                            if (!insideAttached) {
+                                this.attachFolderToTree(path.dirname(snap.path), false, snap.path)
+                            }
                             this.openDocumentFromContent(path.basename(snap.path), snap.path, content, false)
                             restored++
                         } catch { /* skip unreadable file */ }
@@ -14626,6 +14633,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                             this.refreshActiveDocCache()
                         }
                     }
+                    this.updateTreeItems()
                 } catch { /* best effort */ }
             }
             return
