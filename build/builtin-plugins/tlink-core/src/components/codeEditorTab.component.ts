@@ -12593,10 +12593,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 }
                 doc.path = newPath
                 doc.name = path.basename(newPath)
-                doc.folderPath = this.getFolderForPath(newPath) ?? doc.folderPath
+                doc.folderPath = this.getFolderForPath(newPath) ?? path.dirname(newPath)
                 this.rememberRecent(newPath)
                 this.setModelLanguage(doc)
                 this.refreshDocDiskSnapshot(doc, content)
+                // Ensure the parent folder is attached to the tree so the saved file is visible
+                const parentDir = path.dirname(newPath)
+                const parentInTree = this.folders.some(f => this.isTreePathEqualOrDescendant(parentDir, f.path))
+                if (!parentInTree) {
+                    this.attachFolderToTree(parentDir, false)
+                }
+                // Make sure the new file isn't in the hidden set
+                this.revealTreePath(newPath)
                 // Update selection to point to the new file path
                 if (this.selectedFilePathKeys.size && oldPath) {
                     const oldKey = this.getFsPathKey(oldPath)
