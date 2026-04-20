@@ -4,15 +4,25 @@
             .menu-container.left-menu((mouseenter)='openFileMenuOnHover()', (mouseleave)='closeFileMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFileMenu($event)', title='File actions') File
                 .dropdown-menu(*ngIf='fileMenuOpen', (mouseenter)='keepFileMenuOpenOnHover()', (mouseleave)='closeFileMenuOnLeave()', (click)='$event.stopPropagation()')
-                    button(type='button', (click)='handleFileAction("new")') New
+                    button(type='button', (click)='handleFileAction("new")')
+                        span New
+                        span.menu-kbd {{modKey}}+N
                     button(type='button', (click)='handleFileAction("newTopology")') New topology…
                     button(type='button', (click)='handleFileAction("newFolder")') New folder...
-                    button(type='button', (click)='handleFileAction("open")') Open
+                    button(type='button', (click)='handleFileAction("open")')
+                        span Open
+                        span.menu-kbd {{modKey}}+O
                     button(type='button', (click)='handleFileAction("openLocal")') Open local
                     button(type='button', (click)='handleFileAction("openPath")') Open path...
-                    button(type='button', (click)='handleFileAction("save")') Save
-                    button(type='button', (click)='handleFileAction("saveAll")') Save all
-                    button(type='button', (click)='handleFileAction("saveAs")') Save as
+                    button(type='button', (click)='handleFileAction("save")')
+                        span Save
+                        span.menu-kbd {{modKey}}+S
+                    button(type='button', (click)='handleFileAction("saveAll")')
+                        span Save all
+                        span.menu-kbd {{modKey}}+⌥+S
+                    button(type='button', (click)='handleFileAction("saveAs")')
+                        span Save as
+                        span.menu-kbd {{modKey}}+⇧+S
                     button(type='button', (click)='handleFileAction("duplicate")', [disabled]='!canDuplicateOnDisk') Duplicate
                     button(type='button', (click)='handleFileAction("move")', [disabled]='!canMoveOnDisk') Move…
                     button(type='button', (click)='handleFileAction("delete")', [disabled]='!canDeleteOnDisk') Delete (disk)
@@ -20,12 +30,24 @@
             .menu-container.left-menu((mouseenter)='openEditMenuOnHover()', (mouseleave)='closeEditMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleEditMenu($event)', title='Edit actions') ✎ Edit
                 .dropdown-menu(*ngIf='editMenuOpen', (mouseenter)='keepEditMenuOpenOnHover()', (mouseleave)='closeEditMenuOnLeave()', (click)='$event.stopPropagation()')
-                    button(type='button', (click)='handleEditAction("quickOpen")') Quick open
-                    button(type='button', (click)='handleEditAction("undo")') Undo
-                    button(type='button', (click)='handleEditAction("redo")') Redo
-                    button(type='button', (click)='handleEditAction("find")') Find
-                    button(type='button', (click)='handleEditAction("replace")') Replace
-                    button(type='button', (click)='handleEditAction("goto")') Go to line
+                    button(type='button', (click)='handleEditAction("quickOpen")')
+                        span Quick open
+                        span.menu-kbd {{modKey}}+P
+                    button(type='button', (click)='handleEditAction("undo")')
+                        span Undo
+                        span.menu-kbd {{modKey}}+Z
+                    button(type='button', (click)='handleEditAction("redo")')
+                        span Redo
+                        span.menu-kbd {{modKey}}+⇧+Z
+                    button(type='button', (click)='handleEditAction("find")')
+                        span Find
+                        span.menu-kbd {{modKey}}+F
+                    button(type='button', (click)='handleEditAction("replace")')
+                        span Replace
+                        span.menu-kbd {{modKey}}+H
+                    button(type='button', (click)='handleEditAction("goto")')
+                        span Go to line
+                        span.menu-kbd {{modKey}}+G
                     button(type='button', (click)='handleEditAction("format")') Format
                     button(type='button', (click)='handleEditAction("formatJson")') Format JSON
                     button(type='button', (click)='handleEditAction("formatYaml")') Format YAML
@@ -33,10 +55,18 @@
                     button(type='button', (click)='handleEditAction("lowercase")') Lowercase selection
                     button(type='button', (click)='handleEditAction("titleCase")') Title case selection
                     button(type='button', (click)='handleEditAction("trimTrailing")') Trim trailing spaces
-                    button(type='button', (click)='handleEditAction("cut")') Cut
-                    button(type='button', (click)='handleEditAction("copy")') Copy
-                    button(type='button', (click)='handleEditAction("paste")') Paste
-                    button(type='button', (click)='handleEditAction("selectAll")') Select all
+                    button(type='button', (click)='handleEditAction("cut")')
+                        span Cut
+                        span.menu-kbd {{modKey}}+X
+                    button(type='button', (click)='handleEditAction("copy")')
+                        span Copy
+                        span.menu-kbd {{modKey}}+C
+                    button(type='button', (click)='handleEditAction("paste")')
+                        span Paste
+                        span.menu-kbd {{modKey}}+V
+                    button(type='button', (click)='handleEditAction("selectAll")')
+                        span Select all
+                        span.menu-kbd {{modKey}}+A
                     button(type='button', (click)='handleEditAction("send")') Send to terminal
                     button(type='button', (click)='handleEditAction("run")') Run in terminal
                     button(type='button', (click)='openTerminalInNewTab()') Open terminal
@@ -166,6 +196,13 @@
                         .submenu-panel
                             button(*ngFor='let item of recentFiles', type='button', (click)='openRecentFile(item)') {{item | slice:-40}}
                             button(*ngIf='!recentFiles.length', type='button', disabled) No recent files
+                    .submenu-parent([class.open]='toolsSubMenu==="recentFolders"')
+                        button.submenu-trigger(type='button', (click)='toolsSubMenu = toolsSubMenu==="recentFolders" ? null : "recentFolders"') Recent Folders
+                            span.submenu-value {{recentFolders.length || 0}}
+                            i.fas.fa-chevron-right.submenu-arrow
+                        .submenu-panel
+                            button(*ngFor='let item of recentFolders', type='button', (click)='openRecentFolder(item)') {{item | slice:-40}}
+                            button(*ngIf='!recentFolders.length', type='button', disabled) No recent folders
                     .submenu-parent([class.open]='toolsSubMenu==="diff"')
                         button.submenu-trigger(type='button', (click)='toolsSubMenu = toolsSubMenu==="diff" ? null : "diff"') Diff
                             span.submenu-value {{viewMode==="diff" ? "active" : ""}}
@@ -746,6 +783,11 @@
                         i.fa.fa-trash
                     button.btn.btn-link.btn-sm(*ngIf='!sidebarCollapsed', type='button', ngbTooltip='Open existing folder', (click)='openFolderFromDisk()')
                         i.fa.fa-folder-open
+            .tree-filter-bar(*ngIf='!sidebarCollapsed')
+                i.fas.fa-filter.tree-filter-icon
+                input.form-control.form-control-sm.tree-filter-input(type='text', placeholder='Filter files…', [value]='treeFilterQuery', (input)='setTreeFilterQuery($event.target.value)', (keydown.escape)='clearTreeFilter()')
+                button.btn.btn-link.btn-sm.tree-filter-clear(*ngIf='treeFilterQuery', type='button', (click)='clearTreeFilter()', title='Clear filter')
+                    i.fas.fa-times
             .tree-list(*ngIf='!sidebarCollapsed', #treeList, (scroll)='onTreeListScroll()')
                 .tree-virtual-spacer(*ngIf='treeTopSpacerPx > 0', [style.height.px]='treeTopSpacerPx')
                 .tree-row(*ngFor='let item of visibleTreeItems; trackBy: trackTreeItem', [style.paddingLeft.px]='item.depth*12', [style.--tree-depth]='item.depth', [class.folder]='item.node.isFolder', [class.root-node]='item.node.isFolder && item.depth===0', [class.active-folder]='item.node.isFolder && item.node.path===selectedFolderPath && selectedFilePathKeys.size===0', [class.active-doc]='item.node.docId && item.node.docId===activeDocId', [class.selected-file]='!item.node.isFolder && isTreeFileSelected(item.node.path)', [class.selected-folder]='item.node.isFolder && isTreeFolderSelected(item.node.path)', [class.git-modified]='!item.node.isFolder && getGitStatus(item.node.path)==="modified"', [class.git-staged]='!item.node.isFolder && getGitStatus(item.node.path)==="staged"', [class.git-untracked]='!item.node.isFolder && getGitStatus(item.node.path)==="untracked"', (click)='onTreeClick($event, item.node)', (dblclick)='onTreeDblClick($event, item.node)', (contextmenu)='onTreeContextMenu($event, item.node)', [draggable]='!!item.node.path', (dragstart)='item.node.path && onTreeDragStart($event, item.node)', (dragend)='item.node.path && onTreeDragEnd()', (dragover)='item.node.isFolder && onTreeDragOver($event)', (drop)='item.node.isFolder && onTreeDrop($event, item.node.path)')
@@ -999,11 +1041,15 @@
                                 i.fas.fa-plus
                             button.topology-control-btn(type='button', title='Fit to view', (click)='fitTopologyToCanvas()')
                                 i.fas.fa-expand
+                            button.topology-control-btn(type='button', title='Fit to selection', [disabled]='!hasTopologySelection', (click)='fitTopologyToSelection()')
+                                i.fas.fa-expand-arrows-alt
                             .topology-controls-separator
                             button.topology-control-btn(type='button', title='Snap to grid', [class.active]='topologySnapToGrid', (click)='toggleTopologySnapToGrid()')
                                 i.fas.fa-th
                             button.topology-control-btn(type='button', title='Export as PNG', (click)='exportTopologyAsImage()')
                                 i.fas.fa-download
+                            button.topology-control-btn(type='button', title='Export as SVG', (click)='exportTopologyAsSVG()')
+                                i.fas.fa-file-code
                     .topology-inspector(*ngIf='hasTopologySelection')
                         .inspector-title Inspector
                         .inspector-section(*ngIf='selectedTopologyNodeCount')

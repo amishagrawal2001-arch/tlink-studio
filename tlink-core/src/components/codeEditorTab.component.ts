@@ -248,6 +248,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     splitDocId: string|null = null
     cachedActiveDoc: EditorDocument|null = null
     recentFiles: string[] = []
+    recentFolders: string[] = []
     closedDocuments: EditorDocumentSnapshot[] = []
     editingDocId: string|null = null
     editingDocName = ''
@@ -449,6 +450,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private folderTreeModes = new Map<string, FolderTreeMode>()
     private _treeItems: Array<{ node: TreeNode, depth: number }> = []
     private _visibleTreeItems: Array<{ node: TreeNode, depth: number }> = []
+    treeFilterQuery = ''
+    private _filteredTreeItems: Array<{ node: TreeNode, depth: number }>|null = null
     gitFileStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
     private gitStatusTimer?: number
     private gitStatusRefreshMs = 5000
@@ -2076,6 +2079,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private attachFolderToTree (folderPath: string, selectFolder = true, scopeToFilePath: string|null = null): void {
         const resolved = path.resolve(folderPath)
+        // Only track as "recent folder" when user explicitly adds a folder
+        // (selectFolder=true) and it's not a scoped single-file attach.
+        if (selectFolder && !scopeToFilePath) {
+            this.rememberRecentFolder(resolved)
+        }
         const localRoot = path.resolve(this.folderRoot)
         const isNestedLocalPath = this.isTreePathEqualOrDescendant(resolved, localRoot) && !this.isSameFsPath(resolved, localRoot)
         if (isNestedLocalPath) {
@@ -3428,13 +3436,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         // Helpful UX feedback (also acts as a sanity check that click handlers are firing)
         try {
             const nowExpanded = !wasExpanded
-            this.statusMessage = `${nowExpanded ? 'Expanded' : 'Collapsed'}: ${node.name}`
-            window.setTimeout(() => {
-                if (this.statusMessage === `${nowExpanded ? 'Expanded' : 'Collapsed'}: ${node.name}`) {
-                    this.statusMessage = ''
-                    this.cdr.markForCheck()
-                }
-            }, 1200)
+            this.setTransientStatus(`${nowExpanded ? 'Expanded' : 'Collapsed'}: ${node.name}`, 1200)
         } catch {
             // ignore
         }
@@ -4868,6 +4870,125 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         return Math.round(value / this.topologyGridSize) * this.topologyGridSize
     }
 
+    async exportTopologyAsSVG (): Promise<void> {
+        if (!this.topologyData || !this.topologyCanvas?.nativeElement) {
+            return
+        }
+        const nodes = this.topologyData.nodes || []
+        const shapes = this.topologyData.shapes || []
+        const texts = this.topologyData.texts || []
+        if (!nodes.length && !shapes.length && !texts.length) {
+            this.setError('Topology is empty')
+            return
+        }
+
+        // Compute bounding box of all items.
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const node of nodes) {
+            const size = this.getTopologyNodeSize(node)
+            minX = Math.min(minX, node.x); minY = Math.min(minY, node.y)
+            maxX = Math.max(maxX, node.x + size.width); maxY = Math.max(maxY, node.y + size.height)
+        }
+        for (const shape of shapes) {
+            minX = Math.min(minX, shape.x); minY = Math.min(minY, shape.y)
+            maxX = Math.max(maxX, shape.x + shape.width); maxY = Math.max(maxY, shape.y + shape.height)
+        }
+        for (const item of texts) {
+            const textSize = this.getTopologyStickyNoteSize(item)
+            minX = Math.min(minX, item.x); minY = Math.min(minY, item.y)
+            maxX = Math.max(maxX, item.x + textSize.width); maxY = Math.max(maxY, item.y + textSize.height)
+        }
+        const padding = 24
+        minX -= padding; minY -= padding; maxX += padding; maxY += padding
+        const width = Math.round(maxX - minX)
+        const height = Math.round(maxY - minY)
+
+        // Build SVG manually for clean output.
+        const escape = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+        const svgParts: string[] = []
+        svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${width}" height="${height}">`)
+        svgParts.push('<style>.node{fill:#f8fafc;stroke:#64748b;stroke-width:1;rx:6}.node-title{font:600 10px sans-serif;fill:#0f172a;text-anchor:middle}.shape{fill:#e0e7ff;stroke:#6366f1;stroke-width:1}.text-label{font:12px sans-serif;fill:#0f172a}.link{stroke:#64748b;stroke-width:1.5;fill:none}</style>')
+
+        // Render links first (under nodes).
+        const nodeMap = new Map(nodes.map(n => [n.id, n]))
+        const shapeMap = new Map(shapes.map(s => [s.id, s]))
+        for (const link of (this.topologyData.links || [])) {
+            let x1: number, y1: number, x2: number, y2: number
+            if (link.from && link.to) {
+                const from = link.fromKind === 'shape' ? shapeMap.get(link.from) : nodeMap.get(link.from)
+                const to = link.toKind === 'shape' ? shapeMap.get(link.to) : nodeMap.get(link.to)
+                if (!from || !to) { continue }
+                const fromSize = link.fromKind === 'shape'
+                    ? { width: (from as any).width, height: (from as any).height }
+                    : this.getTopologyNodeSize(from as any)
+                const toSize = link.toKind === 'shape'
+                    ? { width: (to as any).width, height: (to as any).height }
+                    : this.getTopologyNodeSize(to as any)
+                x1 = (from as any).x + fromSize.width / 2
+                y1 = (from as any).y + fromSize.height / 2
+                x2 = (to as any).x + toSize.width / 2
+                y2 = (to as any).y + toSize.height / 2
+            } else if (Number.isFinite(Number(link.x1)) && Number.isFinite(Number(link.x2))) {
+                x1 = Number(link.x1); y1 = Number(link.y1); x2 = Number(link.x2); y2 = Number(link.y2)
+            } else {
+                continue
+            }
+            const color = this.normalizeTopologyHexColor(link.color) ?? '#64748b'
+            svgParts.push(`<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}"/>`)
+            if (link.label) {
+                const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+                svgParts.push(`<text class="text-label" x="${mx}" y="${my - 4}" text-anchor="middle">${escape(link.label)}</text>`)
+            }
+        }
+
+        // Render shapes
+        for (const shape of shapes) {
+            const color = this.normalizeTopologyHexColor(shape.color) ?? '#e0e7ff'
+            if (shape.kind === 'circle' || shape.kind === 'oval') {
+                const cx = shape.x + shape.width / 2
+                const cy = shape.y + shape.height / 2
+                const rx = shape.width / 2, ry = shape.height / 2
+                svgParts.push(`<ellipse class="shape" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${color}" fill-opacity="0.2" stroke="${color}"/>`)
+            }
+            if (shape.label) {
+                svgParts.push(`<text class="text-label" x="${shape.x + shape.width / 2}" y="${shape.y + shape.height / 2}" text-anchor="middle" dominant-baseline="middle">${escape(shape.label)}</text>`)
+            }
+        }
+
+        // Render nodes
+        for (const node of nodes) {
+            const size = this.getTopologyNodeSize(node)
+            const color = this.normalizeTopologyHexColor(node.color) ?? '#64748b'
+            svgParts.push(`<rect class="node" x="${node.x}" y="${node.y}" width="${size.width}" height="${size.height}" rx="6" fill="#f8fafc" stroke="${color}"/>`)
+            svgParts.push(`<text class="node-title" x="${node.x + size.width / 2}" y="${node.y + size.height / 2 + 3}">${escape(node.label || node.id)}</text>`)
+        }
+
+        // Render text labels
+        for (const item of texts) {
+            const color = item.color ?? '#0f172a'
+            const fontSize = item.fontSize ?? 14
+            const fontWeight = item.fontWeight ?? 'normal'
+            const fontStyle = item.fontStyle ?? 'normal'
+            svgParts.push(`<text x="${item.x}" y="${item.y + fontSize}" fill="${color}" font-size="${fontSize}" font-weight="${fontWeight}" font-style="${fontStyle}" font-family="sans-serif">${escape(item.text)}</text>`)
+        }
+
+        svgParts.push('</svg>')
+        const svg = svgParts.join('\n')
+
+        // Download
+        const blob = new Blob([svg], { type: 'image/svg+xml' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = (this.getActiveDoc()?.name || 'topology').replace(/\.[^.]+$/, '') + '.svg'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        this.statusMessage = 'Topology exported as SVG'
+        this.updateStatus()
+    }
+
     async exportTopologyAsImage (): Promise<void> {
         if (!this.topologyData) {
             return
@@ -5056,6 +5177,51 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 URL.revokeObjectURL(a.href)
             }
         }, 'image/png')
+    }
+
+    fitTopologyToSelection (): void {
+        if (!this.topologyData || !this.topologyCanvas?.nativeElement) { return }
+        const hasSelection = this.topologySelectedNodeIds.size + this.topologySelectedShapeIds.size + this.topologySelectedTextIds.size > 0
+        if (!hasSelection) {
+            // Fall back to fit-all if nothing selected
+            this.fitTopologyToCanvas()
+            return
+        }
+        const canvasWidth = this.topologyCanvas.nativeElement.clientWidth || 1200
+        const canvasHeight = this.topologyCanvas.nativeElement.clientHeight || 720
+        const points: Array<{ x: number, y: number }> = []
+        for (const node of this.topologyData.nodes) {
+            if (!this.topologySelectedNodeIds.has(node.id)) { continue }
+            const size = this.getTopologyNodeSize(node)
+            points.push({ x: node.x, y: node.y })
+            points.push({ x: node.x + size.width, y: node.y + size.height })
+        }
+        for (const shape of this.topologyData.shapes) {
+            if (!this.topologySelectedShapeIds.has(shape.id)) { continue }
+            points.push({ x: shape.x, y: shape.y })
+            points.push({ x: shape.x + shape.width, y: shape.y + shape.height })
+        }
+        for (const item of this.topologyData.texts) {
+            if (!this.topologySelectedTextIds.has(item.id)) { continue }
+            const textSize = this.getTopologyStickyNoteSize(item)
+            points.push({ x: item.x, y: item.y })
+            points.push({ x: item.x + textSize.width, y: item.y + textSize.height })
+        }
+        if (!points.length) { return }
+        const minX = Math.min(...points.map(p => p.x))
+        const minY = Math.min(...points.map(p => p.y))
+        const maxX = Math.max(...points.map(p => p.x))
+        const maxY = Math.max(...points.map(p => p.y))
+        const width = Math.max(60, maxX - minX)
+        const height = Math.max(60, maxY - minY)
+        const padding = 64
+        const zoomX = (canvasWidth - padding * 2) / width
+        const zoomY = (canvasHeight - padding * 2) / height
+        this.topologyZoom = Math.max(0.3, Math.min(3.5, Math.min(zoomX, zoomY)))
+        this.topologyPanX = Math.round((canvasWidth - width * this.topologyZoom) / 2 - minX * this.topologyZoom)
+        this.topologyPanY = Math.round((canvasHeight - height * this.topologyZoom) / 2 - minY * this.topologyZoom)
+        this.updateTopologyCanvasTransform()
+        this.cdr.markForCheck()
     }
 
     fitTopologyToCanvas (): void {
@@ -8502,8 +8668,52 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private treeVirtualStartIndex = 0
     private treeVirtualEndIndex = 0
 
+    setTreeFilterQuery (value: string): void {
+        this.treeFilterQuery = value || ''
+        this._filteredTreeItems = null
+        this.updateVisibleTreeItems(true)
+        this.cdr.markForCheck()
+    }
+
+    clearTreeFilter (): void {
+        this.setTreeFilterQuery('')
+    }
+
+    private getActiveTreeItems (): Array<{ node: TreeNode, depth: number }> {
+        const q = this.treeFilterQuery.trim().toLowerCase()
+        if (!q) { return this._treeItems }
+        if (this._filteredTreeItems) { return this._filteredTreeItems }
+        // Include folders that contain matching descendants and all matching files.
+        // Simple substring match on the node name.
+        const items = this._treeItems
+        const keepIdx = new Set<number>()
+        // First pass: mark all matches (files/folders whose name contains the query).
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i]
+            if ((item.node.name || '').toLowerCase().includes(q)) {
+                keepIdx.add(i)
+            }
+        }
+        // Second pass: include ancestor folders so path stays visible.
+        // Items are in display order with folders above their children.
+        for (let i = 0; i < items.length; i++) {
+            if (!keepIdx.has(i)) { continue }
+            for (let j = i - 1; j >= 0; j--) {
+                const ancestor = items[j]
+                if (!ancestor.node.isFolder) { continue }
+                if (ancestor.depth < items[i].depth) {
+                    keepIdx.add(j)
+                    if (ancestor.depth === 0) { break }
+                }
+            }
+        }
+        this._filteredTreeItems = items.filter((_, i) => keepIdx.has(i))
+        return this._filteredTreeItems
+    }
+
     private updateVisibleTreeItems (force = false): void {
-        const total = this._treeItems.length
+        const activeItems = this.getActiveTreeItems()
+        const total = activeItems.length
         if (!total) {
             this.treeVirtualStartIndex = 0
             this.treeVirtualEndIndex = 0
@@ -8514,7 +8724,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (total <= this.treeVirtualizationThreshold || !this.treeList?.nativeElement) {
             this.treeVirtualStartIndex = 0
             this.treeVirtualEndIndex = total
-            this._visibleTreeItems = this._treeItems
+            this._visibleTreeItems = activeItems
             return
         }
 
@@ -8529,7 +8739,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
         this.treeVirtualStartIndex = start
         this.treeVirtualEndIndex = end
-        this._visibleTreeItems = this._treeItems.slice(start, end)
+        this._visibleTreeItems = activeItems.slice(start, end)
     }
 
     onTreeListScroll (): void {
@@ -8779,16 +8989,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             console.warn(`[rebuildTreeItems] Post-filter removed ${beforeCount - filtered.length} hidden item(s) that slipped through buildTree`)
         }
         this._treeItems = filtered
+        this._filteredTreeItems = null
         this.updateVisibleTreeItems(true)
         this.pruneFileSelectionToVisibleTree()
         if (truncated) {
-            this.statusMessage = `Explorer truncated to ${this.treeNodeBudget} entries`
-            window.setTimeout(() => {
-                if (this.statusMessage === `Explorer truncated to ${this.treeNodeBudget} entries`) {
-                    this.statusMessage = ''
-                    this.cdr.markForCheck()
-                }
-            }, 2200)
+            this.setTransientStatus(`Explorer truncated to ${this.treeNodeBudget} entries`, 2200)
         }
         this.cdr.markForCheck()
     }
@@ -8976,6 +9181,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cancelEditMenuClose()
         if (this.autosaveTimer) {
             clearInterval(this.autosaveTimer)
+        }
+        if (this.transientStatusTimer) {
+            clearTimeout(this.transientStatusTimer)
+            this.transientStatusTimer = undefined
         }
         if (this.persistStateTimer) {
             clearTimeout(this.persistStateTimer)
@@ -9553,7 +9762,12 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
         let savedCount = 0
         let failedCount = 0
-        for (const doc of dirtyDocs) {
+        const total = dirtyDocs.length
+        for (let i = 0; i < dirtyDocs.length; i++) {
+            const doc = dirtyDocs[i]
+            this.statusMessage = `Saving ${i + 1}/${total}: ${doc.name}`
+            this.updateStatus()
+            this.cdr.markForCheck()
             if (!this.isModelAlive(doc)) {
                 failedCount++
                 continue
@@ -12619,13 +12833,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                         this.selectedFilePathKeys = next
                     }
                 }
-                this.statusMessage = `Saved as ${doc.name}`
-                window.setTimeout(() => {
-                    if (this.statusMessage === `Saved as ${doc.name}`) {
-                        this.statusMessage = ''
-                        this.cdr.markForCheck()
-                    }
-                }, 2500)
+                this.setTransientStatus(`Saved as ${doc.name}`, 2500)
             }
             if (doc.tempPath) {
                 await this.deleteTemp(doc.tempPath)
@@ -14303,6 +14511,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private async restoreState (): Promise<void> {
         this.recentFiles = this.loadRecent()
+        this.recentFolders = this.loadRecentFolders()
         const savedTheme = this.getStateItem('codeEditor.themeMode') as (EditorThemeMode|null)
         if (savedTheme && this.supportedThemeModes.includes(savedTheme)) {
             this.themeMode = savedTheme
@@ -14568,9 +14777,61 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    private transientStatusTimer?: number
+
+    private setTransientStatus (message: string, durationMs = 2000): void {
+        this.statusMessage = message
+        this.updateStatus()
+        if (this.transientStatusTimer) {
+            clearTimeout(this.transientStatusTimer)
+        }
+        this.transientStatusTimer = window.setTimeout(() => {
+            this.transientStatusTimer = undefined
+            if (this.statusMessage === message) {
+                this.statusMessage = ''
+                this.cdr.markForCheck()
+            }
+        }, durationMs)
+    }
+
     private rememberRecent (filePath: string): void {
         this.recentFiles = [filePath, ...this.recentFiles.filter(f => f !== filePath)].slice(0, 10)
         this.setStateItem('codeEditor.recent', JSON.stringify(this.recentFiles))
+    }
+
+    private rememberRecentFolder (folderPath: string): void {
+        if (!folderPath) { return }
+        this.recentFolders = [folderPath, ...this.recentFolders.filter(f => f !== folderPath)].slice(0, 10)
+        this.setStateItem('codeEditor.recentFolders', JSON.stringify(this.recentFolders))
+    }
+
+    private loadRecentFolders (): string[] {
+        const raw = this.getStateItem('codeEditor.recentFolders')
+        if (!raw) { return [] }
+        try {
+            const parsed = JSON.parse(raw)
+            return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : []
+        } catch {
+            return []
+        }
+    }
+
+    openRecentFolder (folderPath: string): void {
+        if (!folderPath) { return }
+        this.toolsMenuOpen = false
+        this.toolsSubMenu = null
+        try {
+            if (fsSync.existsSync(folderPath) && fsSync.statSync(folderPath).isDirectory()) {
+                this.attachFolderToTree(folderPath, true)
+                this.rememberRecentFolder(folderPath)
+            } else {
+                this.setError('Folder no longer exists: ' + folderPath)
+                this.recentFolders = this.recentFolders.filter(f => f !== folderPath)
+                this.setStateItem('codeEditor.recentFolders', JSON.stringify(this.recentFolders))
+            }
+        } catch (err: any) {
+            this.setError(`Cannot open folder: ${err?.message ?? err}`)
+        }
     }
 
     private getActiveEditor (): any {
