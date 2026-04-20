@@ -12597,11 +12597,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.rememberRecent(newPath)
                 this.setModelLanguage(doc)
                 this.refreshDocDiskSnapshot(doc, content)
-                // Ensure the parent folder is attached to the tree so the saved file is visible
+                // Ensure the new file is visible in the tree without exposing
+                // the entire parent directory (BBEdit-style: show only open docs).
                 const parentDir = path.dirname(newPath)
                 const parentInTree = this.folders.some(f => this.isTreePathEqualOrDescendant(parentDir, f.path))
                 if (!parentInTree) {
-                    this.attachFolderToTree(parentDir, false)
+                    // Attach parent folder in "opened files only" mode, scoped
+                    // to just the saved file, so unrelated files aren't shown.
+                    this.attachFolderToTree(parentDir, false, newPath)
                 }
                 // Make sure the new file isn't in the hidden set
                 this.revealTreePath(newPath)
