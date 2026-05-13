@@ -6316,6 +6316,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return
         }
         node.label = value
+        // Invalidate link render so endpoints reflect potentially new node size.
+        this.invalidateTopologyLinkRenderItems()
         this.persistTopologyToDoc()
     }
 
@@ -6349,6 +6351,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
         }
         if (changed) {
+            this.invalidateTopologyLinkRenderItems()
             this.persistTopologyToDoc()
             this.cdr.markForCheck()
         }
@@ -7385,12 +7388,31 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private getTopologyNodeSize (node: TopologyNodeModel): { width: number, height: number } {
         const widthRaw = Number(node.width)
         const heightRaw = Number(node.height)
-        const width = Number.isFinite(widthRaw) ? widthRaw : this.topologyNodeWidthPx
+        // If width is explicitly set, use it. Otherwise auto-fit to label.
+        let width: number
+        if (Number.isFinite(widthRaw)) {
+            width = widthRaw
+        } else {
+            width = this.computeAutoNodeWidth(node)
+        }
         const height = Number.isFinite(heightRaw) ? heightRaw : this.topologyNodeHeightPx
         return {
             width: Math.max(40, Math.min(560, width)),
             height: Math.max(40, Math.min(320, height)),
         }
+    }
+
+    private computeAutoNodeWidth (node: TopologyNodeModel): number {
+        const label = (node.label || node.id || '').trim()
+        const fontSize = node.labelFontSize ?? 11
+        // Rough monospace-like estimate: average char width ~0.6 * fontSize
+        // Plus 12px horizontal padding (6px each side from .topology-node padding).
+        const labelWidth = label.length * fontSize * 0.6 + 16
+        // Account for the device icon (16px) above — node is icon-driven first.
+        const minWidth = this.topologyNodeWidthPx
+        // Cap auto-grow so very long labels don't make nodes huge.
+        const maxAuto = 200
+        return Math.max(minWidth, Math.min(maxAuto, Math.ceil(labelWidth)))
     }
 
     private getTopologyStickyNoteSize (item: TopologyTextModel): { width: number, height: number } {
@@ -12303,6 +12325,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.focusedEditor = 'split'
             this.updateStatus()
         })
+        this.splitEditor.onDidChangeCursorPosition?.(() => this.updateStatus())
+        this.splitEditor.onDidChangeCursorSelection?.(() => this.updateStatus())
         const docToShow = targetDoc ?? this.pickSplitDoc()
         this.splitDocId = docToShow?.id ?? null
         this.splitEditor.setModel(docToShow?.model ?? null)
@@ -12474,6 +12498,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             })
 
             this.primaryEditor.onDidChangeCursorPosition(() => {
+                this.updateStatus()
+            })
+
+            this.primaryEditor.onDidChangeCursorSelection?.(() => {
                 this.updateStatus()
             })
 
@@ -12954,7 +12982,22 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             return
         }
         const pos = editor.getPosition?.() ?? editor.getModifiedEditor?.()?.getPosition?.()
-        this.statusLineCol = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : ''
+        let lineCol = pos ? `Ln ${pos.lineNumber}, Col ${pos.column}` : ''
+        // Add selection details if any text is selected
+        try {
+            const selection = editor.getSelection?.() ?? editor.getModifiedEditor?.()?.getSelection?.()
+            if (selection && !selection.isEmpty()) {
+                const selectedText = doc.model.getValueInRange(selection)
+                const chars = selectedText.length
+                const lines = selection.endLineNumber - selection.startLineNumber + 1
+                if (lines > 1) {
+                    lineCol += `  ·  ${chars} chars, ${lines} lines selected`
+                } else {
+                    lineCol += `  ·  ${chars} chars selected`
+                }
+            }
+        } catch { /* ignore */ }
+        this.statusLineCol = lineCol
         try {
             const lang = this.monaco.editor.getModelLanguageId?.(doc.model) ?? ''
             this.statusLanguage = lang || ''
@@ -13820,6 +13863,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.focusedEditor = 'split'
             this.updateStatus()
         })
+        this.splitEditor.onDidChangeCursorPosition?.(() => this.updateStatus())
+        this.splitEditor.onDidChangeCursorSelection?.(() => this.updateStatus())
         const targetDoc = this.pickSplitDoc()
         this.splitDocId = targetDoc?.id ?? null
         this.splitEditor.setModel(targetDoc?.model ?? null)
