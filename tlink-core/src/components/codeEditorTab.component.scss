@@ -1305,7 +1305,12 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
+    padding: 4px;
+    background: color-mix(in srgb, var(--theme-bg-more) 65%, var(--theme-bg) 35%);
+    border: 1px solid color-mix(in srgb, var(--theme-fg) 6%, transparent);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
     .topology-tool-btn {
         width: 30px;
@@ -1315,6 +1320,25 @@
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
+        border-radius: 6px;
+        background: transparent;
+        border: 1px solid transparent;
+        transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+
+        &:hover {
+            background: color-mix(in srgb, var(--theme-fg) 8%, transparent);
+            border-color: color-mix(in srgb, var(--theme-fg) 10%, transparent);
+        }
+
+        &:active:not([disabled]) {
+            transform: scale(0.94);
+        }
+
+        &.active {
+            background: color-mix(in srgb, var(--theme-accent) 18%, transparent);
+            border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+            color: var(--theme-accent);
+        }
 
         i {
             pointer-events: none;
@@ -1332,21 +1356,22 @@
     .topology-sep {
         width: 1px;
         height: 20px;
-        margin: 0 2px;
-        background: color-mix(in srgb, var(--theme-fg) 18%, transparent);
+        margin: 0 4px;
+        background: color-mix(in srgb, var(--theme-fg) 12%, transparent);
         border-radius: 2px;
     }
 
     .topology-zoom-indicator {
-        min-width: 46px;
+        min-width: 50px;
         height: 30px;
-        padding: 0 8px;
-        border: 1px solid var(--theme-bg-less);
+        padding: 0 10px;
+        border: 1px solid color-mix(in srgb, var(--theme-fg) 8%, transparent);
         border-radius: 6px;
-        background: var(--theme-bg-more);
+        background: var(--theme-bg);
         color: var(--theme-fg-less);
         font-size: 11px;
         font-weight: 600;
+        font-variant-numeric: tabular-nums;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1389,25 +1414,23 @@
 .topology-canvas {
     position: relative;
     min-height: 0;
-    border: 1px solid var(--theme-bg-less);
-    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--theme-fg) 8%, transparent);
+    border-radius: 10px;
     overflow: hidden;
     touch-action: none;
-    background-color: var(--theme-bg-more);
+    cursor: grab;
+    // Clean dot grid like Figma / Excalidraw, with subtle vignette
+    background-color: color-mix(in srgb, var(--theme-bg) 88%, var(--theme-bg-more) 12%);
     background-image:
-        linear-gradient(0deg, rgba(127, 127, 127, 0.16) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(127, 127, 127, 0.16) 1px, transparent 1px),
-        linear-gradient(180deg, var(--theme-bg-more), var(--theme-bg));
-    background-color: color-mix(in srgb, var(--theme-bg) 78%, var(--theme-bg-more) 22%);
-    background-image:
-        linear-gradient(0deg, color-mix(in srgb, var(--theme-fg) 13%, transparent) 1px, transparent 1px),
-        linear-gradient(90deg, color-mix(in srgb, var(--theme-fg) 13%, transparent) 1px, transparent 1px),
-        linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--theme-fg) 8%, var(--theme-bg) 92%),
-            color-mix(in srgb, var(--theme-fg) 2%, var(--theme-bg) 98%)
-        );
-    background-size: 24px 24px, 24px 24px, 100% 100%;
+        radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--theme-fg) 14%, transparent) 1px, transparent 0),
+        radial-gradient(circle at center, transparent 60%, color-mix(in srgb, var(--theme-fg) 4%, transparent) 100%);
+    background-size: 20px 20px, 100% 100%;
+    background-position: 0 0, 0 0;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+
+    &:active {
+        cursor: grabbing;
+    }
 
     &.dragging-free-link,
     &.dragging-free-link * {
@@ -1447,16 +1470,16 @@
 
 .topology-link {
     stroke: var(--topology-link-color, #78b4ff);
-    stroke-width: 3;
+    stroke-width: 2;
     fill: none;
     stroke-linecap: round;
     stroke-linejoin: round;
     pointer-events: none;
-    opacity: 0.95;
+    opacity: 0.88;
     transition: stroke 120ms ease, stroke-width 120ms ease, opacity 120ms ease;
 
     &.free-link.undirected {
-        stroke-width: 3.6;
+        stroke-width: 2.5;
         opacity: 1;
     }
 
@@ -1465,10 +1488,10 @@
     }
 
     &.selected {
-        stroke-width: 5;
+        stroke-width: 3;
         stroke: var(--topology-link-color, #78b4ff);
         opacity: 1;
-        filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 2px rgba(0, 0, 0, 0.85));
+        filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--topology-link-color, var(--theme-accent)) 50%, transparent));
     }
 }
 
@@ -1775,42 +1798,51 @@
 
 .topology-controls {
     position: absolute;
-    bottom: 12px;
-    right: 12px;
+    bottom: 16px;
+    right: 16px;
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px 6px;
-    background: var(--theme-bg);
-    border: 1px solid var(--theme-bg-less);
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 5px 7px;
+    background: color-mix(in srgb, var(--theme-bg) 95%, var(--theme-bg-more) 5%);
+    border: 1px solid color-mix(in srgb, var(--theme-fg) 8%, transparent);
+    border-radius: 10px;
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.06),
+        0 6px 16px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
     z-index: 10;
     user-select: none;
+    backdrop-filter: blur(8px);
 
     .topology-control-btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
         padding: 0;
-        border: none;
-        border-radius: 6px;
+        border: 1px solid transparent;
+        border-radius: 7px;
         background: transparent;
         color: var(--theme-fg);
-        font-size: 12px;
+        font-size: 13px;
         cursor: pointer;
-        transition: background 0.15s, color 0.15s;
+        transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
 
         &:hover:not(:disabled) {
-            background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.15);
+            background: color-mix(in srgb, var(--theme-fg) 8%, transparent);
             color: var(--theme-accent);
         }
 
+        &:active:not(:disabled) {
+            transform: scale(0.92);
+        }
+
         &.active {
-            background: rgba(var(--theme-accent-rgb, 46, 124, 232), 0.18);
+            background: color-mix(in srgb, var(--theme-accent) 18%, transparent);
             color: var(--theme-accent);
+            border-color: color-mix(in srgb, var(--theme-accent) 30%, transparent);
         }
 
         &:disabled {
@@ -1843,9 +1875,8 @@
     width: 50px;
     min-height: 50px;
     height: 50px;
-    border: 1px solid var(--theme-bg-less);
-    border: 1px solid color-mix(in srgb, var(--theme-bg-less) 65%, var(--topology-node-color, var(--theme-accent)) 35%);
-    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--theme-bg-less) 50%, var(--topology-node-color, var(--theme-accent)) 50%);
+    border-radius: 8px;
     padding: 3px 2px;
     display: flex;
     flex-direction: column;
@@ -1854,13 +1885,28 @@
     gap: 1px;
     user-select: none;
     cursor: grab;
-    background: var(--theme-bg-more);
-    background: color-mix(in srgb, var(--theme-bg) 84%, var(--topology-node-color, var(--theme-accent)) 16%);
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--theme-bg-more) 92%, var(--topology-node-color, var(--theme-accent)) 8%) 0%,
+        color-mix(in srgb, var(--theme-bg-more) 78%, var(--topology-node-color, var(--theme-accent)) 22%) 100%
+    );
     color: var(--theme-fg);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.08),
+        0 2px 6px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
     overflow: hidden;
     z-index: 3;
     will-change: left, top, width, height;
+    transition: box-shadow 0.15s ease, transform 0.08s ease, border-color 0.15s ease;
+
+    &:hover:not(.dragging):not(.resizing) {
+        box-shadow:
+            0 2px 4px rgba(0, 0, 0, 0.1),
+            0 4px 12px rgba(0, 0, 0, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        transform: translateY(-1px);
+    }
 
     &:active {
         cursor: grabbing;
@@ -1868,9 +1914,10 @@
 
     &.selected {
         border-color: var(--topology-node-color, var(--theme-accent));
-        outline: 2px solid rgba(255, 255, 255, 0.82);
-        outline-offset: 0;
-        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.62), 0 2px 10px rgba(0, 0, 0, 0.4);
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--topology-node-color, var(--theme-accent)) 45%, transparent),
+            0 4px 12px rgba(0, 0, 0, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
     &.resizing {
@@ -1879,12 +1926,27 @@
 
     &.dragging {
         cursor: grabbing;
+        box-shadow:
+            0 8px 24px rgba(0, 0, 0, 0.18),
+            0 0 0 2px color-mix(in srgb, var(--topology-node-color, var(--theme-accent)) 35%, transparent);
+        transform: scale(1.04);
     }
 
     &.pending-link-source {
         border-color: var(--theme-accent);
-        border-color: color-mix(in srgb, var(--theme-accent) 65%, #ffffff 35%);
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--theme-accent) 45%, transparent),
+            0 0 12px color-mix(in srgb, var(--theme-accent) 60%, transparent);
+        animation: topology-pulse 1.5s ease-in-out infinite;
     }
+}
+
+@keyframes topology-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-accent) 45%, transparent), 0 0 12px color-mix(in srgb, var(--theme-accent) 60%, transparent); }
+    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme-accent) 30%, transparent), 0 0 16px color-mix(in srgb, var(--theme-accent) 50%, transparent); }
+}
+
+.topology-node {
 
     .node-title {
         font-size: 8px;
@@ -2037,13 +2099,17 @@
 }
 
 .topology-inspector {
-    border: 1px solid var(--theme-bg-less);
-    border-radius: 8px;
-    padding: 10px;
-    background: var(--theme-bg);
+    border: 1px solid color-mix(in srgb, var(--theme-fg) 8%, transparent);
+    border-radius: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--theme-bg) 95%, var(--theme-bg-more) 5%);
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.04),
+        0 4px 12px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     min-height: 0;
     overflow: auto;
 
