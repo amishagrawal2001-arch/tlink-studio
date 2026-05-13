@@ -1081,12 +1081,18 @@
 
     .dirty-indicator {
         color: var(--theme-accent);
-        font-size: 9px;
+        font-size: 11px;
         flex-shrink: 0;
-        width: 10px;
+        width: 12px;
         text-align: center;
         font-weight: 700;
+        line-height: 1;
         animation: pulse 2s ease-in-out infinite;
+    }
+
+    .name.dirty-name {
+        font-style: italic;
+        color: color-mix(in srgb, var(--theme-fg) 92%, var(--theme-accent) 8%);
     }
 
     .git-indicator {

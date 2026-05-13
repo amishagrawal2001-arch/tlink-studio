@@ -12661,8 +12661,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.queueSaveTemp(doc)
             if (this.topologyCanvasMode && this.activeDocId === doc.id && !this.topologyWritingDoc) {
                 this.loadTopologyFromDoc(doc)
-                this.cdr.markForCheck()
             }
+            // Ensure tree dirty indicator and name refresh.
+            this.cdr.markForCheck()
         }))
         doc.modelDisposables.push(model.onDidChangeOptions(() => {
             let opts: any
