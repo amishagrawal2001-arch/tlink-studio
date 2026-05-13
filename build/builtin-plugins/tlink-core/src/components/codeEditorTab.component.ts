@@ -5295,19 +5295,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         event.preventDefault()
 
-        const modeScale = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-            ? 18
-            : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 120 : 1)
-
-        if (event.ctrlKey || event.metaKey) {
-            // Pinch-to-zoom on trackpad or Ctrl+wheel: accumulate zoom factor.
-            const step = event.deltaY < 0 ? 1.04 : (1 / 1.04)
-            this.wheelAccumZoomFactor *= step
-        } else {
-            // Pan: accumulate deltas.
-            this.wheelAccumDeltaX += (Number.isFinite(event.deltaX) ? event.deltaX * modeScale : 0)
-            this.wheelAccumDeltaY += (Number.isFinite(event.deltaY) ? event.deltaY * modeScale : 0)
-        }
+        // Scroll wheel = zoom only (no panning).
+        // Use drag the canvas to pan. Trackpad pinch (ctrl/meta+wheel)
+        // also zooms — kept for backwards-compatible pinch gesture support.
+        const step = event.deltaY < 0 ? 1.04 : (1 / 1.04)
+        this.wheelAccumZoomFactor *= step
         this.wheelLastClientX = event.clientX
         this.wheelLastClientY = event.clientY
 
@@ -5317,22 +5309,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.wheelRafPending = true
         requestAnimationFrame(() => {
             this.wheelRafPending = false
-
-            // Flush accumulated zoom.
             if (this.wheelAccumZoomFactor !== 1) {
                 this.adjustTopologyZoom(this.wheelAccumZoomFactor, this.wheelLastClientX, this.wheelLastClientY)
                 this.wheelAccumZoomFactor = 1
             }
-
-            // Flush accumulated pan.
-            if (Math.abs(this.wheelAccumDeltaX) > 0.01 || Math.abs(this.wheelAccumDeltaY) > 0.01) {
-                this.topologyPanX = Math.round(this.topologyPanX - this.wheelAccumDeltaX)
-                this.topologyPanY = Math.round(this.topologyPanY - this.wheelAccumDeltaY)
-                this.wheelAccumDeltaX = 0
-                this.wheelAccumDeltaY = 0
-                this.clearTopologyPointerSpaceCache()
-            }
-
             this.updateTopologyCanvasTransform()
             this.invalidateTopologyLinkRenderItems()
             this.cdr.detectChanges()
@@ -5512,6 +5492,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (event.detail > 1) {
             return
         }
+        // Middle-click or Alt+left-click → pan (legacy behavior)
         if (event.button === 1 || (event.button === 0 && event.altKey)) {
             this.beginTopologyPanDrag(event, false)
             return
@@ -5555,11 +5536,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.topologyPendingLinkSourceId = null
             this.topologyPendingLinkSourceKind = null
         }
-        if (!appendSelection) {
+        // Shift/Cmd/Ctrl + left-click drag → marquee multi-select.
+        // Plain left-click drag → pan canvas (BBEdit/Figma-style).
+        if (appendSelection) {
+            this.beginTopologyMarqueeDrag(event)
+        } else {
             this.clearTopologySelection()
             this.cdr.markForCheck()
+            this.beginTopologyPanDrag(event, false)
         }
-        this.beginTopologyMarqueeDrag(event)
     }
 
     onTopologyCanvasContextMenu (event: MouseEvent): void {
@@ -9127,8 +9112,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private boundOnResize = () => this.onWindowResize()
     private boundOnWheel = (e: WheelEvent) => this.onTopologyCanvasWheel(e)
     private wheelRafPending = false
-    private wheelAccumDeltaX = 0
-    private wheelAccumDeltaY = 0
     private wheelAccumZoomFactor = 1
     private wheelLastClientX = 0
     private wheelLastClientY = 0

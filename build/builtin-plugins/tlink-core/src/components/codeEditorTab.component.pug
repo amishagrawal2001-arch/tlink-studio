@@ -622,7 +622,7 @@
                             |  — Align elements to a 24px grid for clean layouts
                         li
                             strong Zoom & Pan
-                            |  — Trackpad pinch-to-zoom with smooth accumulation. Scroll wheel to pan. Zoom +/- buttons with fit-to-view
+                            |  — Drag empty canvas to pan. Shift+drag to marquee-select. Scroll wheel or trackpad pinch to zoom. Zoom +/- buttons with fit-to-view + fit-to-selection
                         li
                             strong Export as PNG
                             |  — Download the topology diagram as a high-resolution image
@@ -926,7 +926,7 @@
                     button.btn.btn-sm.btn-outline-secondary.btn-icon.topology-tool-btn(type='button', ngbTooltip='Restore snapshot', aria-label='Restore snapshot', (click)='restorePreviousTopologySnapshot()', [disabled]='!canRestoreTopologySnapshot')
                         i.fa.fa-history
                     span.topology-hint Cmd/Ctrl/Shift-click to multi-select
-                    span.topology-hint Drag empty canvas to select, scroll wheel to pan
+                    span.topology-hint Drag empty canvas to pan, Shift+drag to marquee-select, scroll wheel to zoom
                     span.topology-hint Right-click empty canvas for sticky note options
                     span.topology-hint Cmd/Ctrl+C/V duplicate selected nodes
                     span.topology-hint(*ngIf='topologyTextPlacementMode') Click canvas to place text
