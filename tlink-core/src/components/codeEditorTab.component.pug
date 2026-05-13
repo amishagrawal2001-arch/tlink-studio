@@ -1023,8 +1023,8 @@
                                 span.topology-node-icon.topology-device-icon(*ngIf='getTopologyNodeIconKind(node)==="default"', aria-hidden='true')
                                     svg(viewBox='0 0 16 16')
                                         circle(cx='8', cy='8', r='3.8')
-                                .node-title(*ngIf='!isTopologyInlineEditingNode(node.id)') {{node.label}}
-                                input.node-title.topology-inline-input(*ngIf='isTopologyInlineEditingNode(node.id)', type='text', [value]='topologyInlineEditValue', [attr.data-inline-kind]='"node"', [attr.data-inline-id]='node.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
+                                .node-title(*ngIf='!isTopologyInlineEditingNode(node.id)', [style.font-size.px]='node.labelFontSize || null') {{node.label}}
+                                input.node-title.topology-inline-input(*ngIf='isTopologyInlineEditingNode(node.id)', type='text', [value]='topologyInlineEditValue', [style.font-size.px]='node.labelFontSize || null', [attr.data-inline-kind]='"node"', [attr.data-inline-id]='node.id', (mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()', (dblclick)='$event.stopPropagation()', (input)='onTopologyInlineEditInput($event.target.value)', (keydown)='onTopologyInlineEditKeydown($event)', (blur)='onTopologyInlineEditBlur()')
                                 .node-meta {{node.type}}
                                 span.topology-item-resize-handle(*ngIf='isTopologyNodeSelected(node.id)', (mousedown)='startTopologyNodeResize($event, node.id)', (click)='$event.stopPropagation()')
                         .topology-marquee(*ngIf='topologyMarqueeActive', [style.left.px]='topologyMarqueeLeftPx', [style.top.px]='topologyMarqueeTopPx', [style.width.px]='topologyMarqueeWidthPx', [style.height.px]='topologyMarqueeHeightPx')
@@ -1058,6 +1058,8 @@
                             select.form-select.form-select-sm([value]='selectedTopologyNodesColorValue', (change)='updateSelectedTopologyNodeColor($event.target.value)')
                                 option(*ngIf='selectedTopologyNodeCount > 1 && !selectedTopologyNodesColorValue', value='') Mixed (choose color)
                                 option(*ngFor='let option of topologyNodeColorOptions', [value]='option.value') {{option.label}}
+                            label Label font size
+                            input.form-control.form-control-sm(type='number', min='7', max='24', step='1', [value]='selectedTopologyNodesLabelFontSize', (change)='updateSelectedTopologyNodeLabelFontSize($event.target.valueAsNumber)')
                         .inspector-section(*ngIf='selectedTopologyNode as node')
                             label Label
                             input.form-control.form-control-sm(type='text', [value]='node.label', (input)='updateSelectedTopologyNodeLabel($event.target.value)')

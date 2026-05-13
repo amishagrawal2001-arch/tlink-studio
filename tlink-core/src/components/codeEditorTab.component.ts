@@ -94,6 +94,7 @@ interface TopologyNodeModel {
     width?: number
     height?: number
     color?: string
+    labelFontSize?: number
 }
 
 type TopologyLinkEndpointKind = 'node'|'shape'
@@ -6325,6 +6326,46 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         node.type = value || 'node'
         this.persistTopologyToDoc()
+    }
+
+    updateSelectedTopologyNodeLabelFontSize (value: number): void {
+        if (!this.topologyData || !Number.isFinite(value)) {
+            return
+        }
+        const clamped = Math.max(7, Math.min(24, Math.round(value)))
+        let changed = false
+        if (this.topologySelectedNodeIds.size) {
+            for (const node of this.topologyData.nodes) {
+                if (!this.topologySelectedNodeIds.has(node.id)) { continue }
+                if (node.labelFontSize !== clamped) {
+                    node.labelFontSize = clamped
+                    changed = true
+                }
+            }
+        } else if (this.selectedTopologyNode) {
+            if (this.selectedTopologyNode.labelFontSize !== clamped) {
+                this.selectedTopologyNode.labelFontSize = clamped
+                changed = true
+            }
+        }
+        if (changed) {
+            this.persistTopologyToDoc()
+            this.cdr.markForCheck()
+        }
+    }
+
+    get selectedTopologyNodesLabelFontSize (): number {
+        // Returns the size if all selected nodes share one, else 11 (default)
+        if (this.topologySelectedNodeIds.size && this.topologyData) {
+            const sizes = new Set<number>()
+            for (const node of this.topologyData.nodes) {
+                if (this.topologySelectedNodeIds.has(node.id)) {
+                    sizes.add(node.labelFontSize ?? 11)
+                }
+            }
+            return sizes.size === 1 ? Array.from(sizes)[0] : 11
+        }
+        return this.selectedTopologyNode?.labelFontSize ?? 11
     }
 
     updateSelectedTopologyNodeColor (value: string): void {
