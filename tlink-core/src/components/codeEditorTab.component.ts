@@ -411,6 +411,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyPanX = 0
     topologyPanY = 0
     showTopologyMinimap = true
+    formatOnSave = false
     topologyMarqueeActive = false
     topologyMarqueeLeftPx = 0
     topologyMarqueeTopPx = 0
@@ -13180,6 +13181,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private pickLanguage (fileName: string, content?: string): string {
+        // Shebang takes precedence — a #! line is an unambiguous declaration of the interpreter
+        const firstLine = (content ?? '').trimStart().split('\n')[0] || ''
+        if (firstLine.startsWith('#!')) {
+            if (firstLine.includes('python')) return 'python'
+            if (/\b(node|deno)\b/.test(firstLine)) return 'javascript'
+            if (/\b(bash|zsh|sh|ksh|fish)\b/.test(firstLine)) return 'shell'
+            if (firstLine.includes('ruby')) return 'ruby'
+            if (firstLine.includes('perl')) return 'perl'
+        }
         const ext = (fileName.split('.').pop() || '').toLowerCase()
         const lang = this.monaco?.languages.getLanguages().find(l => l.extensions?.includes('.' + ext))
         if (lang?.id) {
@@ -13267,6 +13277,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private async saveDocument (doc: EditorDocument): Promise<boolean> {
         if (!this.isModelAlive(doc)) { return false }
+        if (this.formatOnSave && doc.id === this.activeDocId) {
+            try { await this.runEditorActionSafely('editor.action.formatDocument') } catch { /* ignore */ }
+        }
         const content = doc.model.getValue()
         const data = new TextEncoder().encode(content)
 
@@ -14347,6 +14360,77 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const lang = this.pickLanguage(doc.name, doc.model.getValue())
         this.monaco.editor.setModelLanguage(doc.model, lang)
         doc.languageId = lang
+        try { this.applyEditorConfigForDoc(doc) } catch { /* ignore */ }
+    }
+
+    private applyEditorConfigForDoc (doc: EditorDocument): void {
+        if (!doc?.path || !doc.model) { return }
+        const cfg = this.readEditorConfig(doc.path, doc.name)
+        if (!cfg) { return }
+        if (cfg.indent_style === 'tab') {
+            doc.model.updateOptions({ insertSpaces: false })
+        } else if (cfg.indent_style === 'space') {
+            const size = cfg.indent_size && cfg.indent_size > 0 ? cfg.indent_size : 4
+            doc.model.updateOptions({ insertSpaces: true, tabSize: size })
+        }
+        if (cfg.end_of_line) {
+            const eol = cfg.end_of_line === 'crlf' ? '\r\n' : '\n'
+            try { (doc.model as any).setEOL(eol === '\r\n' ? 1 : 0) } catch { /* ignore */ }
+        }
+    }
+
+    private readEditorConfig (filePath: string, _fileName: string): {
+        indent_style?: string, indent_size?: number, end_of_line?: string,
+    } | null {
+        try {
+            const fsSync = (window as any).require?.('fs')
+            if (!fsSync) { return null }
+            // Walk up from file dir looking for .editorconfig
+            let dir = path.dirname(filePath)
+            const found: Array<{path: string, content: string}> = []
+            for (let i = 0; i < 12; i++) {
+                const candidate = path.join(dir, '.editorconfig')
+                try {
+                    const content = fsSync.readFileSync(candidate, 'utf8') as string
+                    found.unshift({ path: candidate, content })
+                    if (/^\s*root\s*=\s*true/im.test(content)) { break }
+                } catch { /* not present */ }
+                const parent = path.dirname(dir)
+                if (parent === dir) { break }
+                dir = parent
+            }
+            if (!found.length) { return null }
+            // Apply '*' globs then more-specific globs (simple parser; ignores complex patterns)
+            const result: any = {}
+            for (const file of found) {
+                const lines = file.content.split('\n')
+                let inMatchingSection = false
+                for (const raw of lines) {
+                    const line = raw.trim()
+                    if (!line || line.startsWith('#') || line.startsWith(';')) { continue }
+                    const sec = line.match(/^\[(.+)\]$/)
+                    if (sec) {
+                        const pattern = sec[1]
+                        inMatchingSection = pattern === '*' || pattern.includes('*')
+                        continue
+                    }
+                    if (!inMatchingSection) { continue }
+                    const kv = line.match(/^([\w_]+)\s*=\s*(.+)$/)
+                    if (!kv) { continue }
+                    const key = kv[1].toLowerCase()
+                    let value: any = kv[2].trim().toLowerCase()
+                    if (key === 'indent_size' || key === 'tab_width') {
+                        value = parseInt(value, 10)
+                        if (!isNaN(value)) result.indent_size = value
+                    } else {
+                        result[key] = value
+                    }
+                }
+            }
+            return Object.keys(result).length ? result : null
+        } catch {
+            return null
+        }
     }
 
     private registerEditorShortcuts (editor: any): void {

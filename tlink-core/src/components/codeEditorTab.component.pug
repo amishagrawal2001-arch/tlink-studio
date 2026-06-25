@@ -122,6 +122,8 @@
             .menu-container.left-menu((mouseenter)='openFormatMenuOnHover()', (mouseleave)='closeFormatMenuOnLeave()')
                 button.btn.btn-sm.btn-outline-secondary(type='button', (click)='toggleFormatMenu($event)', title='Format options') Format
                 .dropdown-menu.format-menu(*ngIf='formatMenuOpen', (mouseenter)='keepFormatMenuOpenOnHover()', (mouseleave)='closeFormatMenuOnLeave()', (click)='$event.stopPropagation()')
+                    button(type='button', [class.active-item]='formatOnSave', (click)='formatOnSave=!formatOnSave; formatMenuOpen=false')
+                        | Format on Save {{formatOnSave ? '✓' : ''}}
                     .submenu-parent([class.open]='formatSubMenu==="fontFamily"')
                         button.submenu-trigger(type='button', (click)='formatSubMenu = formatSubMenu==="fontFamily" ? null : "fontFamily"') Font Family
                             span.submenu-value {{editorFontFamilyLabel}}
