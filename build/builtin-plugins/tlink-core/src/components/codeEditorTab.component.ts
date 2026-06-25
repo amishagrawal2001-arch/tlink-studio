@@ -12578,6 +12578,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             minimap: { enabled: this.minimapEnabled },
             theme: this.currentThemeId(),
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
+            // Stop scrolling once the last line is in view — no infinite empty space below.
+            scrollBeyondLastLine: false,
+            scrollBeyondLastColumn: 4,
             lineNumbersMinChars: 2,
             lineDecorationsWidth: 6,
             glyphMargin: false,
