@@ -1181,6 +1181,7 @@
             span.status-tip(*ngIf='topologyCanvasMode && !topologySelectionSummary') Drag canvas to pan, scroll to zoom, Shift+drag to multi-select
         .status-center(*ngIf='breadcrumbs.length') {{breadcrumbs.join(' / ')}}
         .status-right
+            span.status-line-numbers-toggle(title='Line numbers (click to cycle: on / relative / off)', (click)='cycleLineNumbersStyle()', style='cursor: pointer;') #{'¶'} {{editorLineNumbersStyle}}
             span.git-status-indicator(*ngIf='gitBranch', title='Git status (click to refresh)', (click)='refreshGitStatusManually()')
                 span.git-branch &#x2387; {{gitBranch}}
                 span.git-count.git-modified(*ngIf='gitModifiedCount') M{{gitModifiedCount}}

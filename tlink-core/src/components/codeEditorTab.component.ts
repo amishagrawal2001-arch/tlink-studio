@@ -9138,6 +9138,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    cycleLineNumbersStyle (): void {
+        const order = ['on', 'relative', 'off']
+        const idx = order.indexOf(this.editorLineNumbersStyle)
+        const next = order[(idx + 1) % order.length]
+        this.handleFormatAction(next === 'on' ? 'lineNumbersOn' : next === 'relative' ? 'lineNumbersRelative' : 'lineNumbersOff')
+        this.setTransientStatus(`Line numbers: ${next}`, 1500)
+    }
+
     refreshGitStatusManually (): void {
         void this.refreshGitStatus()
         this.setTransientStatus('Git status refreshed', 1500)
@@ -14458,6 +14466,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             editor.getAction?.('editor.action.quickOutline')?.run?.()
         })
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyP, () => this.openCommandPalette())
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyL, () => this.cycleLineNumbersStyle())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, () => this.runActiveFile())
         this.registerEditorContextActions(editor)
         this.registerEditorMouseSelectionFallback(editor)
