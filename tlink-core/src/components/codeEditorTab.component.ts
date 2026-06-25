@@ -118,6 +118,7 @@ interface TopologyLinkModel {
     directed?: boolean
     bidirectional?: boolean
     labels?: TopologyLinkLabelModel[]
+    labelFontSize?: number
 }
 
 interface TopologyLinkLabelModel {
@@ -200,6 +201,7 @@ interface TopologyLinkRenderItem {
     color?: string
     directed: boolean
     bidirectional: boolean
+    labelFontSize?: number
 }
 
 interface TopologyLinkRenderLabelItem {
@@ -354,6 +356,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     // Multi-file search
     showGlobalSearch = false
+
+    // Markdown preview
+    showMarkdownPreview = false
+    markdownPreviewHtml: any = ''
     globalSearchQuery = ''
     globalSearchResults: Array<{ docId: string, docName: string, line: number, column: number, text: string, matchStart: number, matchEnd: number }> = []
     globalSearchResultCount = 0
@@ -3863,6 +3869,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             !!this.selectedTopologyText
     }
 
+    get topologySelectionSummary (): string {
+        const parts: string[] = []
+        const n = this.topologySelectedNodeIds.size
+        const l = this.topologySelectedLinkIds.size
+        const s = this.topologySelectedShapeIds.size
+        const t = this.topologySelectedTextIds.size
+        if (n) parts.push(`${n} node${n === 1 ? '' : 's'}`)
+        if (l) parts.push(`${l} link${l === 1 ? '' : 's'}`)
+        if (s) parts.push(`${s} shape${s === 1 ? '' : 's'}`)
+        if (t) parts.push(`${t} text${t === 1 ? '' : 's'}`)
+        return parts.length ? parts.join(', ') + ' selected' : ''
+    }
+
     get hasTopologySelection (): boolean {
         return this.topologySelectedNodeIds.size > 0 ||
             this.topologySelectedLinkIds.size > 0 ||
@@ -4101,6 +4120,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 color: this.normalizeTopologyHexColor(link.color) ?? this.getTopologyDefaultLinkColor(),
                 directed: style !== 'line',
                 bidirectional: style === 'double',
+                labelFontSize: link.labelFontSize,
             })
         }
         return items
@@ -5178,6 +5198,33 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 URL.revokeObjectURL(a.href)
             }
         }, 'image/png')
+    }
+
+    autoLayoutTopologyNodes (): void {
+        if (!this.topologyData || !this.topologyData.nodes.length) {
+            this.setError('No nodes to lay out')
+            return
+        }
+        this.commitTopologyHistoryIfChanged(this.serializeTopology(this.topologyData))
+        const nodes = this.topologyData.nodes
+        const count = nodes.length
+        const cols = Math.max(1, Math.ceil(Math.sqrt(count * 1.6)))
+        const colWidth = this.topologyNodeWidthPx + 40
+        const rowHeight = this.topologyNodeHeightPx + 40
+        const startX = 80
+        const startY = 80
+        nodes.forEach((node, i) => {
+            const row = Math.floor(i / cols)
+            const col = i % cols
+            node.x = startX + col * colWidth
+            node.y = startY + row * rowHeight
+        })
+        this.invalidateTopologyLinkRenderItems()
+        this.persistTopologyToDoc()
+        this.setTransientStatus(`Auto-laid out ${count} node${count === 1 ? '' : 's'}`, 1500)
+        // Fit view to the new layout.
+        window.setTimeout(() => this.fitTopologyToCanvas(), 50)
+        this.cdr.markForCheck()
     }
 
     fitTopologyToSelection (): void {
@@ -6414,6 +6461,46 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         this.syncTopologyLegacyLinkLabelFields(link)
         this.persistTopologyToDoc()
+    }
+
+    updateSelectedTopologyLinkLabelFontSize (value: number): void {
+        if (!this.topologyData || !Number.isFinite(value)) {
+            return
+        }
+        const clamped = Math.max(7, Math.min(24, Math.round(value)))
+        let changed = false
+        if (this.topologySelectedLinkIds.size) {
+            for (const link of this.topologyData.links) {
+                if (!this.topologySelectedLinkIds.has(link.id)) { continue }
+                if (link.labelFontSize !== clamped) {
+                    link.labelFontSize = clamped
+                    changed = true
+                }
+            }
+        } else if (this.selectedTopologyLink) {
+            if (this.selectedTopologyLink.labelFontSize !== clamped) {
+                this.selectedTopologyLink.labelFontSize = clamped
+                changed = true
+            }
+        }
+        if (changed) {
+            this.invalidateTopologyLinkRenderItems()
+            this.persistTopologyToDoc()
+            this.cdr.markForCheck()
+        }
+    }
+
+    get selectedTopologyLinksLabelFontSize (): number {
+        if (this.topologySelectedLinkIds.size && this.topologyData) {
+            const sizes = new Set<number>()
+            for (const link of this.topologyData.links) {
+                if (this.topologySelectedLinkIds.has(link.id)) {
+                    sizes.add(link.labelFontSize ?? 11)
+                }
+            }
+            return sizes.size === 1 ? Array.from(sizes)[0] : 11
+        }
+        return this.selectedTopologyLink?.labelFontSize ?? 11
     }
 
     updateSelectedTopologyLinkColor (value: string): void {
@@ -9595,6 +9682,74 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    async openCommandPalette (): Promise<void> {
+        if (!(await this.ensureEditor())) {
+            return
+        }
+        type CmdResult = () => void | Promise<void>
+        const cmds: SelectorOption<CmdResult>[] = [
+            // File
+            { name: 'New file', group: 'File', result: () => this.newFile(), weight: -10 },
+            { name: 'New topology', group: 'File', result: () => this.handleFileAction('newTopology') },
+            { name: 'Open file…', group: 'File', result: () => this.handleFileAction('open') },
+            { name: 'Open by path…', group: 'File', result: () => this.openFileByPathPrompt() },
+            { name: 'Save', group: 'File', result: () => this.saveFile() },
+            { name: 'Save as…', group: 'File', result: () => this.saveFileAs() },
+            { name: 'Save all', group: 'File', result: () => this.saveAllFiles() },
+            { name: 'Reopen closed file', group: 'File', result: () => this.reopenClosed() },
+            // Edit
+            { name: 'Quick open file (fuzzy)', group: 'Edit', result: () => this.openQuickOpen() },
+            { name: 'Find', group: 'Edit', result: () => this.runFind() },
+            { name: 'Replace', group: 'Edit', result: () => this.runReplace() },
+            { name: 'Go to line', group: 'Edit', result: () => this.goToLine() },
+            { name: 'Format document', group: 'Edit', result: () => this.formatDocument() },
+            { name: 'Format JSON', group: 'Edit', result: () => this.formatAsJSON() },
+            { name: 'Format YAML', group: 'Edit', result: () => this.formatAsYAML() },
+            { name: 'Trim trailing whitespace', group: 'Edit', result: () => this.handleEditAction('trimTrailing') },
+            // View
+            { name: 'Toggle word wrap', group: 'View', result: () => this.toggleWordWrap() },
+            { name: 'Toggle minimap', group: 'View', result: () => this.toggleMinimap() },
+            { name: 'Toggle sidebar', group: 'View', result: () => this.toggleSidebarCollapsed() },
+            { name: 'Toggle autosave', group: 'View', result: () => this.toggleAutosave() },
+            { name: 'Toggle diagnostics', group: 'View', result: () => this.toggleDiagnostics() },
+            { name: 'Toggle split view', group: 'View', result: () => this.toggleSplitView() },
+            { name: 'Search in files', group: 'View', result: () => this.toggleGlobalSearch() },
+            { name: 'Toggle markdown preview', group: 'View', result: () => this.toggleMarkdownPreview() },
+            { name: 'Open terminal', group: 'View', result: () => this.openTerminalInNewTab() },
+            // Tools
+            { name: 'Diff vs disk', group: 'Tools', result: () => this.compareWithDisk() },
+            { name: 'Exit diff', group: 'Tools', result: () => this.exitDiffMode() },
+            // Topology (only relevant when canvas is active)
+            ...(this.topologyCanvasMode ? [
+                { name: 'Topology: Fit to view', group: 'Topology', result: () => this.fitTopologyToCanvas() },
+                { name: 'Topology: Fit to selection', group: 'Topology', result: () => this.fitTopologyToSelection() },
+                { name: 'Topology: Auto-layout (grid)', group: 'Topology', result: () => this.autoLayoutTopologyNodes() },
+                { name: 'Topology: Reset zoom', group: 'Topology', result: () => this.resetTopologyViewport() },
+                { name: 'Topology: Zoom in', group: 'Topology', result: () => this.zoomTopologyIn() },
+                { name: 'Topology: Zoom out', group: 'Topology', result: () => this.zoomTopologyOut() },
+                { name: 'Topology: Export as PNG', group: 'Topology', result: () => this.exportTopologyAsImage() },
+                { name: 'Topology: Export as SVG', group: 'Topology', result: () => this.exportTopologyAsSVG() },
+                { name: 'Topology: Toggle snap to grid', group: 'Topology', result: () => this.toggleTopologySnapToGrid() },
+                { name: 'Topology: Clear canvas', group: 'Topology', result: () => this.clearTopologyCanvas() },
+                { name: 'Topology: Select all items', group: 'Topology', result: () => this.selectAllTopologyItems() },
+            ] as SelectorOption<CmdResult>[] : []),
+            // Sample files
+            { name: 'Insert sample: JSON', group: 'Samples', result: () => this.openSampleFile('json') },
+            { name: 'Insert sample: YAML', group: 'Samples', result: () => this.openSampleFile('yaml') },
+            { name: 'Insert sample: Topology', group: 'Samples', result: () => this.openSampleFile('topology') },
+            { name: 'Insert sample: Python', group: 'Samples', result: () => this.openSampleFile('python') },
+            // Help
+            { name: 'Show help', group: 'Help', result: () => this.toggleHelp() },
+        ]
+        const picked = await this.app.showSelector<CmdResult>('Command Palette', cmds).catch(() => null)
+        if (!picked) { return }
+        try {
+            await picked()
+        } catch (err: any) {
+            this.setError(`Command failed: ${err?.message ?? err}`)
+        }
+    }
+
     async openFileByPathPrompt (): Promise<void> {
         const input = await this.promptForName('Open file/folder path', '')
         if (input == null) {
@@ -10884,7 +11039,21 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!(await this.ensureEditor())) {
             return
         }
-        this.getActiveEditor()?.trigger('keyboard', 'actions.find', null)
+        const editor = this.getActiveEditor()
+        if (!editor) { return }
+        // If there's a multi-line selection, open Find scoped to that selection.
+        const selection = editor.getSelection?.()
+        const hasMultiLineSelection = selection && !selection.isEmpty()
+            && selection.startLineNumber !== selection.endLineNumber
+        if (hasMultiLineSelection) {
+            editor.getAction?.('actions.find')?.run?.()
+            // Toggle "Find in selection" mode (matchesInSelection).
+            window.setTimeout(() => {
+                editor.trigger?.('keyboard', 'toggleFindInSelection', null)
+            }, 50)
+            return
+        }
+        editor.trigger('keyboard', 'actions.find', null)
     }
 
     async runReplace (): Promise<void> {
@@ -11862,6 +12031,40 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.cdr.markForCheck()
     }
 
+    toggleMarkdownPreview (): void {
+        this.showMarkdownPreview = !this.showMarkdownPreview
+        if (this.showMarkdownPreview) {
+            this.renderMarkdownPreview()
+        }
+        this.cdr.markForCheck()
+    }
+
+    private renderMarkdownPreview (): void {
+        const doc = this.getActiveDoc()
+        if (!doc || !this.isModelAlive(doc)) {
+            this.markdownPreviewHtml = ''
+            return
+        }
+        try {
+            const content = doc.model.getValue() || ''
+            // Lazy-require marked so it doesn't bloat the initial bundle.
+            const marked = (window as any).require?.('marked') ?? require('marked')
+            // marked v17 returns a Promise from parse() when async:true; sync version is parse()
+            const html = marked.parse?.(content, { async: false }) ?? marked(content)
+            this.markdownPreviewHtml = typeof html === 'string' ? html : String(html)
+        } catch (err: any) {
+            this.markdownPreviewHtml = `<p style="color:#e54">Markdown render error: ${err?.message ?? err}</p>`
+        }
+        this.cdr.markForCheck()
+    }
+
+    get isMarkdownDocActive (): boolean {
+        const doc = this.getActiveDoc()
+        if (!doc) { return false }
+        const name = (doc.name || '').toLowerCase()
+        return name.endsWith('.md') || name.endsWith('.markdown')
+    }
+
     runGlobalSearch (query: string): void {
         this.globalSearchQuery = query
         this.globalSearchResults = []
@@ -12410,6 +12613,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.updateTitle(doc)
         this.updateStatus()
         this.syncTopologyForActiveDoc()
+        if (this.showMarkdownPreview) {
+            this.renderMarkdownPreview()
+        }
         this.persistState()
     }
 
@@ -12664,6 +12870,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             this.queueSaveTemp(doc)
             if (this.topologyCanvasMode && this.activeDocId === doc.id && !this.topologyWritingDoc) {
                 this.loadTopologyFromDoc(doc)
+            }
+            // Re-render markdown preview live when the active markdown doc changes.
+            if (this.showMarkdownPreview && this.activeDocId === doc.id && this.isMarkdownDocActive) {
+                this.renderMarkdownPreview()
             }
             // Ensure tree dirty indicator and name refresh.
             this.cdr.markForCheck()
@@ -13501,6 +13711,27 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.duplicateSelectedTopologyNodes()
                 return
             }
+            if (ctrlOrMeta && !event.shiftKey && key === '0') {
+                event.preventDefault()
+                this.resetTopologyViewport()
+                return
+            }
+            if (ctrlOrMeta && !event.shiftKey && key === 's') {
+                event.preventDefault()
+                this.flushTopologyPersist()
+                this.setTransientStatus('Topology saved', 1200)
+                return
+            }
+            if (ctrlOrMeta && (key === '=' || key === '+')) {
+                event.preventDefault()
+                this.zoomTopologyIn()
+                return
+            }
+            if (ctrlOrMeta && key === '-') {
+                event.preventDefault()
+                this.zoomTopologyOut()
+                return
+            }
         }
         if (this.topologyCanvasMode && (event.key === 'Delete' || event.key === 'Backspace')) {
             if (!this.canDeleteSelectedTopology) {
@@ -13909,6 +14140,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyF, () => this.runFind())
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyF, () => this.runReplace())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyG, () => this.goToLine())
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyO, () => {
+            editor.getAction?.('editor.action.quickOutline')?.run?.()
+        })
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyP, () => this.openCommandPalette())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, () => this.runActiveFile())
         this.registerEditorContextActions(editor)
         this.registerEditorMouseSelectionFallback(editor)
@@ -15098,8 +15333,19 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         // Close all context menus
         this.cancelEditMenuClose()
         this.cancelFileMenuClose()
+        this.cancelFormatMenuClose?.()
+        this.cancelToolsMenuClose?.()
+        this.cancelViewMenuClose?.()
+        this.cancelThemeMenuClose?.()
         this.editMenuOpen = false
         this.fileMenuOpen = false
+        this.viewMenuOpen = false
+        this.formatMenuOpen = false
+        this.formatSubMenu = null
+        this.toolsMenuOpen = false
+        this.toolsSubMenu = null
+        this.themeMenuOpen = false
+        this.themeSubMenu = null
         this.docContextMenuOpen = false
         this.folderContextMenuOpen = false
         this.fileContextMenuOpen = false

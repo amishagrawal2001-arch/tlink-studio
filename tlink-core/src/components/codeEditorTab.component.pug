@@ -100,6 +100,9 @@
                     button(type='button', (click)='viewMenuOpen=false; toggleGlobalSearch()')
                         i.fas.fa-search(style='margin-right: 6px;')
                         | {{showGlobalSearch ? 'Hide Search in Files' : 'Search in Files'}}
+                    button(type='button', [disabled]='!isMarkdownDocActive', (click)='viewMenuOpen=false; toggleMarkdownPreview()')
+                        i.fab.fa-markdown(style='margin-right: 6px;')
+                        | {{showMarkdownPreview ? 'Hide Markdown Preview' : 'Show Markdown Preview'}}
                     button(type='button', (click)='viewMenuOpen=false; toggleHelp()')
                         i.fas.fa-question-circle(style='margin-right: 6px;')
                         | Help
@@ -981,7 +984,7 @@
                                     circle.topology-link-end-hit(*ngIf='!item.isFree', [attr.cx]='item.startX', [attr.cy]='item.startY', r='10', (mousedown)='startTopologyFreeLinkDrag($event, item.id)', (click)='onTopologyLinkClick($event, item.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id)')
                                     circle.topology-link-end-hit(*ngIf='!item.isFree', [attr.cx]='item.endX', [attr.cy]='item.endY', r='10', (mousedown)='startTopologyFreeLinkDrag($event, item.id)', (click)='onTopologyLinkClick($event, item.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id)')
                                     ng-container(*ngFor='let label of item.labels; trackBy: trackTopologyLinkRenderLabel')
-                                        text.topology-link-label(*ngIf='label.text', [class.selected]='isTopologyLinkSelected(item.id)', [attr.x]='label.labelX', [attr.y]='label.labelY', (mousedown)='$event.stopPropagation()', (click)='onTopologyLinkClick($event, item.id, label.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id, label.id)') {{label.text}}
+                                        text.topology-link-label(*ngIf='label.text', [class.selected]='isTopologyLinkSelected(item.id)', [attr.x]='label.labelX', [attr.y]='label.labelY', [attr.font-size]='item.labelFontSize || null', (mousedown)='$event.stopPropagation()', (click)='onTopologyLinkClick($event, item.id, label.id)', (dblclick)='onTopologyLinkDoubleClick($event, item.id, label.id)') {{label.text}}
                                     circle.topology-link-handle(*ngIf='item.isFree && isTopologyLinkSelected(item.id)', [attr.cx]='item.startX', [attr.cy]='item.startY', r='6', (mousedown)='startTopologyFreeLinkHandleDrag($event, item.id, "start")')
                                     circle.topology-link-handle(*ngIf='item.isFree && isTopologyLinkSelected(item.id)', [attr.cx]='item.endX', [attr.cy]='item.endY', r='6', (mousedown)='startTopologyFreeLinkHandleDrag($event, item.id, "end")')
                             ng-container(*ngFor='let item of topologyLinkRenderItems; trackBy: trackTopologyLinkRender')
@@ -1043,6 +1046,8 @@
                                 i.fas.fa-expand
                             button.topology-control-btn(type='button', title='Fit to selection', [disabled]='!hasTopologySelection', (click)='fitTopologyToSelection()')
                                 i.fas.fa-expand-arrows-alt
+                            button.topology-control-btn(type='button', title='Auto-layout (grid)', (click)='autoLayoutTopologyNodes()')
+                                i.fas.fa-th-large
                             .topology-controls-separator
                             button.topology-control-btn(type='button', title='Snap to grid', [class.active]='topologySnapToGrid', (click)='toggleTopologySnapToGrid()')
                                 i.fas.fa-th
@@ -1077,6 +1082,8 @@
                                 option(value='arrow') Arrow
                                 option(value='double') Double arrow
                                 option(value='line') Line
+                            label Label font size
+                            input.form-control.form-control-sm(type='number', min='7', max='24', step='1', [value]='selectedTopologyLinksLabelFontSize', (change)='updateSelectedTopologyLinkLabelFontSize($event.target.valueAsNumber)')
                         .inspector-section(*ngIf='selectedTopologyLink as link')
                             .inspector-subtitle Link {{link.id}}
                             label Link label
@@ -1139,10 +1146,19 @@
                     div.editor-host(#splitHost)
                 .editor-pane.diff([class.hidden]='viewMode!=="diff"')
                     div.editor-host(#diffHost)
+                .editor-pane.markdown-preview(*ngIf='showMarkdownPreview && isMarkdownDocActive')
+                    .markdown-preview-header
+                        i.fab.fa-markdown(style='margin-right: 6px;')
+                        | Markdown Preview
+                        button.btn.btn-sm.btn-link.markdown-preview-close(type='button', (click)='toggleMarkdownPreview()', title='Close preview')
+                            i.fas.fa-times
+                    .markdown-preview-body([innerHTML]='markdownPreviewHtml')
     .code-editor-status
         .status-left
             span.status-message(*ngIf='statusLabel') {{statusLabel}}
             span.status-tip(*ngIf='!topologyCanvasMode') Tip: click line numbers to select full lines (Shift+click for range), right-click editor to add sticky note
+            span.status-tip(*ngIf='topologyCanvasMode && topologySelectionSummary') {{topologySelectionSummary}}
+            span.status-tip(*ngIf='topologyCanvasMode && !topologySelectionSummary') Drag canvas to pan, scroll to zoom, Shift+drag to multi-select
         .status-center(*ngIf='breadcrumbs.length') {{breadcrumbs.join(' / ')}}
         .status-right
             span {{statusLineCol}}
