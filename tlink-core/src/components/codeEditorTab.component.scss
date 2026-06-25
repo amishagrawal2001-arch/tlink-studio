@@ -1802,6 +1802,50 @@
     border-radius: 4px;
 }
 
+.topology-group-box {
+    position: absolute;
+    border: 1px dashed rgba(255,255,255,0.25);
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 0;
+    .topology-group-label {
+        position: absolute;
+        top: -10px;
+        left: 8px;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 6px;
+        background: rgba(20,20,28,0.85);
+        color: rgba(255,255,255,0.85);
+        border-radius: 3px;
+        letter-spacing: 0.5px;
+    }
+}
+
+.topology-minimap {
+    position: absolute;
+    right: 12px;
+    bottom: 60px;
+    width: 160px;
+    height: 100px;
+    background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    cursor: crosshair;
+    z-index: 20;
+    overflow: hidden;
+    svg { display: block; width: 100%; height: 100%; }
+    .minimap-bg { fill: rgba(255,255,255,0.02); }
+    .minimap-node { stroke: rgba(255,255,255,0.4); stroke-width: 8; opacity: 0.85; }
+    .minimap-viewport {
+        fill: rgba(100,180,255,0.15);
+        stroke: rgba(100,180,255,0.9);
+        stroke-width: 16;
+        pointer-events: none;
+    }
+}
+
 .topology-controls {
     position: absolute;
     bottom: 16px;
@@ -2512,6 +2556,24 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+        }
+
+        .git-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            font-size: 11px;
+            &:hover { background: rgba(255,255,255,0.08); }
+            .git-branch { color: #8ab4f8; font-weight: 500; }
+            .git-count { font-weight: 600; }
+            .git-modified { color: #f0b400; }
+            .git-staged { color: #4caf50; }
+            .git-untracked { color: #888; }
         }
 
         .btn-icon {

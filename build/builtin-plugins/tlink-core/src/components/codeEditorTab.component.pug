@@ -254,6 +254,10 @@
                         .submenu-panel
                             button(type='button', [class.active-item]='editorThemePresetValue==="custom"', (click)='onEditorThemePresetChange("custom"); themeMenuOpen=false; themeSubMenu=null') Custom
                             button(*ngFor='let preset of editorThemePresets', type='button', [class.active-item]='editorThemePresetValue===preset.color', (click)='onEditorThemePresetChange(preset.color); themeMenuOpen=false; themeSubMenu=null') {{preset.name}}
+                    .submenu-parent
+                        button.submenu-trigger(type='button', (click)='themeSubMenu = themeSubMenu==="terminal" ? null : "terminal"') Terminal Theme
+                        .submenu-panel(*ngIf='themeSubMenu==="terminal"')
+                            button(*ngFor='let preset of terminalColorSchemePresets', type='button', (click)='applyTerminalColorSchemePreset(preset.name); themeMenuOpen=false; themeSubMenu=null') {{preset.name}}
         .toolbar-right
             button.btn.btn-sm.topology-mode-toggle(type='button', *ngIf='canShowTopologyToggle', (click)='toggleTopologyCanvasMode()', [class.mode-canvas]='topologyCanvasMode', [class.mode-editor]='!topologyCanvasMode', [disabled]='viewMode==="diff"')
                 i.fas(style='margin-right: 5px;', [ngClass]='topologyCanvasMode ? "fa-code" : "fa-project-diagram"')
@@ -824,6 +828,8 @@
                 button(type='button', (click)='handleFileContextAction("delete")') {{selectionContextDeleteLabel}}
             .dropdown-menu.doc-context-menu(*ngIf='docContextMenuOpen', [style.left.px]='docContextMenuX', [style.top.px]='docContextMenuY', (click)='$event.stopPropagation()')
                 button(type='button', (click)='renameDocumentFromContextMenu()') Rename…
+                button(type='button', (click)='moveContextDocument(-1)', [disabled]='!canMoveContextDocument(-1)') Move Up
+                button(type='button', (click)='moveContextDocument(1)', [disabled]='!canMoveContextDocument(1)') Move Down
                 button(type='button', (click)='moveDocumentFromContextMenu(null)') Move to All documents
                 button(*ngFor='let folder of folders', type='button', (click)='moveDocumentFromContextMenu(folder.path)') Move to {{folder.name}}
                 button(type='button', (click)='closeDocumentFromContextMenu()') Close
@@ -973,6 +979,8 @@
                 .topology-workspace(*ngIf='!topologyParseError', [class.inspector-visible]='hasTopologySelection')
                     .topology-canvas(#topologyCanvas, [class.dragging-free-link]='!!topologyDragFreeLinkId || topologyFreeLinkCreating', [class.dragging-node]='!!topologyDragNodeId', [class.dragging-shape]='!!topologyDragShapeId', [class.link-mode]='!!topologyPendingLinkSourceId || topologyLinkPreviewActive', (mousedown)='onTopologyCanvasBackgroundMouseDown($event)', (dblclick)='onTopologyCanvasDoubleClick($event)', (contextmenu)='onTopologyCanvasContextMenu($event)')
                         .topology-viewport([style.transform]='cachedTopologyCanvasTransform')
+                            .topology-group-box(*ngFor='let g of topologyGroupBoxes', [style.left.px]='g.x', [style.top.px]='g.y', [style.width.px]='g.w', [style.height.px]='g.h', [style.background]='g.color')
+                                span.topology-group-label {{g.name}}
                             svg.topology-links
                                 defs
                                     marker#topologyArrowhead(markerWidth='8', markerHeight='8', refX='7', refY='4', orient='auto-start-reverse')
@@ -1031,6 +1039,12 @@
                                 .node-meta {{node.type}}
                                 span.topology-item-resize-handle(*ngIf='isTopologyNodeSelected(node.id)', (mousedown)='startTopologyNodeResize($event, node.id)', (click)='$event.stopPropagation()')
                         .topology-marquee(*ngIf='topologyMarqueeActive', [style.left.px]='topologyMarqueeLeftPx', [style.top.px]='topologyMarqueeTopPx', [style.width.px]='topologyMarqueeWidthPx', [style.height.px]='topologyMarqueeHeightPx')
+                    .topology-minimap(*ngIf='showTopologyMinimap && topologyNodes.length', (mousedown)='$event.stopPropagation()', (click)='onMinimapClick($event)', title='Click to pan')
+                        svg(width='160', height='100', [attr.viewBox]='topologyMinimapViewBox', preserveAspectRatio='xMidYMid meet')
+                            rect.minimap-bg(x='0', y='0', width='100%', height='100%')
+                            g
+                                rect.minimap-node(*ngFor='let n of topologyNodes', [attr.x]='n.x', [attr.y]='n.y', [attr.width]='getTopologyNodeWidth(n)', [attr.height]='getTopologyNodeHeight(n)', [attr.fill]='n.color || "#5a9bd5"')
+                            rect.minimap-viewport(*ngIf='topologyMinimapViewport', [attr.x]='topologyMinimapViewport.x', [attr.y]='topologyMinimapViewport.y', [attr.width]='topologyMinimapViewport.w', [attr.height]='topologyMinimapViewport.h')
                     .topology-controls((mousedown)='$event.stopPropagation()', (click)='$event.stopPropagation()')
                             button.topology-control-btn(type='button', title='Undo (Ctrl+Z)', [disabled]='!canUndoTopology', (click)='runTopologyUndo()')
                                 i.fas.fa-undo
@@ -1055,6 +1069,10 @@
                                 i.fas.fa-download
                             button.topology-control-btn(type='button', title='Export as SVG', (click)='exportTopologyAsSVG()')
                                 i.fas.fa-file-code
+                            button.topology-control-btn(type='button', title='Toggle minimap', [class.active]='showTopologyMinimap', (click)='showTopologyMinimap=!showTopologyMinimap')
+                                i.fas.fa-map
+                            button.topology-control-btn(type='button', title='Group selected nodes', [disabled]='!hasTopologySelection', (click)='setGroupForSelectedTopologyNodes()')
+                                i.fas.fa-object-group
                     .topology-inspector(*ngIf='hasTopologySelection')
                         .inspector-title Inspector
                         .inspector-section(*ngIf='selectedTopologyNodeCount')
@@ -1161,6 +1179,11 @@
             span.status-tip(*ngIf='topologyCanvasMode && !topologySelectionSummary') Drag canvas to pan, scroll to zoom, Shift+drag to multi-select
         .status-center(*ngIf='breadcrumbs.length') {{breadcrumbs.join(' / ')}}
         .status-right
+            span.git-status-indicator(*ngIf='gitBranch', title='Git status (click to refresh)', (click)='refreshGitStatusManually()')
+                span.git-branch &#x2387; {{gitBranch}}
+                span.git-count.git-modified(*ngIf='gitModifiedCount') M{{gitModifiedCount}}
+                span.git-count.git-staged(*ngIf='gitStagedCount') S{{gitStagedCount}}
+                span.git-count.git-untracked(*ngIf='gitUntrackedCount') ?{{gitUntrackedCount}}
             span {{statusLineCol}}
             span {{statusLanguage}}
             span {{statusEOL}}

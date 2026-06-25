@@ -95,6 +95,7 @@ interface TopologyNodeModel {
     height?: number
     color?: string
     labelFontSize?: number
+    group?: string
 }
 
 type TopologyLinkEndpointKind = 'node'|'shape'
@@ -409,6 +410,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyZoom = 1
     topologyPanX = 0
     topologyPanY = 0
+    showTopologyMinimap = true
     topologyMarqueeActive = false
     topologyMarqueeLeftPx = 0
     topologyMarqueeTopPx = 0
@@ -460,6 +462,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     treeFilterQuery = ''
     private _filteredTreeItems: Array<{ node: TreeNode, depth: number }>|null = null
     gitFileStatuses = new Map<string, 'modified'|'staged'|'untracked'>()
+    gitBranch: string|null = null
+    gitModifiedCount = 0
+    gitStagedCount = 0
+    gitUntrackedCount = 0
     private gitStatusTimer?: number
     private gitStatusRefreshMs = 5000
     private treeKeyboardActive = false
@@ -3914,6 +3920,120 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     get topologyZoomLabel (): string {
         return `${Math.round(this.topologyZoom * 100)}%`
+    }
+
+    get topologyMinimapBounds (): {x: number, y: number, w: number, h: number} | null {
+        if (!this.topologyNodes.length) { return null }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const n of this.topologyNodes) {
+            const w = this.getTopologyNodeWidth(n)
+            const h = this.getTopologyNodeHeight(n)
+            if (n.x < minX) minX = n.x
+            if (n.y < minY) minY = n.y
+            if (n.x + w > maxX) maxX = n.x + w
+            if (n.y + h > maxY) maxY = n.y + h
+        }
+        const pad = 40
+        return { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2 }
+    }
+
+    get topologyMinimapViewBox (): string {
+        const b = this.topologyMinimapBounds
+        if (!b) { return '0 0 100 100' }
+        return `${b.x} ${b.y} ${b.w} ${b.h}`
+    }
+
+    get topologyMinimapViewport (): {x: number, y: number, w: number, h: number} | null {
+        const b = this.topologyMinimapBounds
+        if (!b) { return null }
+        const canvas = (document.querySelector('.topology-canvas') as HTMLElement | null)
+        if (!canvas) { return null }
+        const rect = canvas.getBoundingClientRect()
+        const z = this.topologyZoom || 1
+        return {
+            x: -this.topologyPanX / z,
+            y: -this.topologyPanY / z,
+            w: rect.width / z,
+            h: rect.height / z,
+        }
+    }
+
+    get topologyGroupBoxes (): Array<{name: string, x: number, y: number, w: number, h: number, color: string}> {
+        const groups = new Map<string, TopologyNodeModel[]>()
+        for (const n of this.topologyNodes) {
+            if (!n.group) { continue }
+            const arr = groups.get(n.group) || []
+            arr.push(n)
+            groups.set(n.group, arr)
+        }
+        const boxes: Array<{name: string, x: number, y: number, w: number, h: number, color: string}> = []
+        let idx = 0
+        for (const [name, nodes] of groups.entries()) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+            for (const n of nodes) {
+                const w = this.getTopologyNodeWidth(n)
+                const h = this.getTopologyNodeHeight(n)
+                if (n.x < minX) minX = n.x
+                if (n.y < minY) minY = n.y
+                if (n.x + w > maxX) maxX = n.x + w
+                if (n.y + h > maxY) maxY = n.y + h
+            }
+            const pad = 16
+            const colors = [
+                'rgba(255,209,102,0.18)', 'rgba(102,187,255,0.18)', 'rgba(166,226,46,0.18)',
+                'rgba(217,128,250,0.18)', 'rgba(255,128,128,0.18)', 'rgba(100,255,218,0.18)',
+            ]
+            boxes.push({
+                name,
+                x: minX - pad, y: minY - pad,
+                w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2,
+                color: colors[idx % colors.length],
+            })
+            idx++
+        }
+        return boxes
+    }
+
+    setGroupForSelectedTopologyNodes (): void {
+        const ids = this.topologySelectedNodeIds
+        if (!ids || !ids.size) {
+            this.setTransientStatus('Select nodes first', 1500)
+            return
+        }
+        const firstId = ids.values().next().value as string
+        const firstNode = this.topologyNodes.find(n => n.id === firstId)
+        const current = firstNode?.group || ''
+        const next = window.prompt('Group name (empty to ungroup):', current)
+        if (next === null) { return }
+        const group = next.trim() || undefined
+        try { this.pushTopologyUndoState(JSON.stringify(this.topologyData)) } catch { /* ignore */ }
+        for (const n of this.topologyNodes) {
+            if (ids.has(n.id)) {
+                n.group = group
+            }
+        }
+        this.persistTopologyToDoc()
+        this.cdr.markForCheck()
+    }
+
+    onMinimapClick (event: MouseEvent): void {
+        const svg = (event.currentTarget as HTMLElement).querySelector('svg') as SVGSVGElement | null
+        if (!svg) { return }
+        const rect = svg.getBoundingClientRect()
+        const b = this.topologyMinimapBounds
+        if (!b) { return }
+        const fx = (event.clientX - rect.left) / rect.width
+        const fy = (event.clientY - rect.top) / rect.height
+        const worldX = b.x + fx * b.w
+        const worldY = b.y + fy * b.h
+        const canvas = (document.querySelector('.topology-canvas') as HTMLElement | null)
+        if (!canvas) { return }
+        const cr = canvas.getBoundingClientRect()
+        const z = this.topologyZoom || 1
+        this.topologyPanX = Math.round(cr.width / 2 - worldX * z)
+        this.topologyPanY = Math.round(cr.height / 2 - worldY * z)
+        this.cachedTopologyCanvasTransform = `translate(${this.topologyPanX}px, ${this.topologyPanY}px) scale(${this.topologyZoom})`
+        this.cdr.markForCheck()
     }
 
     get canAlignTopologyNodes (): boolean {
@@ -9017,6 +9137,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    refreshGitStatusManually (): void {
+        void this.refreshGitStatus()
+        this.setTransientStatus('Git status refreshed', 1500)
+    }
+
     private async refreshGitStatus (): Promise<void> {
         const folders = Array.from(this.expandedFolders).concat(
             this.documents.filter(d => d.path).map(d => path.dirname(d.path!)),
@@ -9069,6 +9194,32 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 }
             }
             this.gitFileStatuses = nextStatuses
+            // Compute aggregate counts
+            let mod = 0, staged = 0, untracked = 0
+            for (const v of nextStatuses.values()) {
+                if (v === 'modified') mod++
+                else if (v === 'staged') staged++
+                else if (v === 'untracked') untracked++
+            }
+            this.gitModifiedCount = mod
+            this.gitStagedCount = staged
+            this.gitUntrackedCount = untracked
+            // Detect branch (use the first folder root that's a git repo)
+            try {
+                const { execSync } = (window as any).require('child_process')
+                let detectedBranch: string|null = null
+                for (const folder of roots) {
+                    try {
+                        detectedBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+                            cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+                        }).trim() || null
+                        if (detectedBranch) { break }
+                    } catch { /* not a git repo */ }
+                }
+                this.gitBranch = detectedBranch
+            } catch {
+                this.gitBranch = null
+            }
             this.cdr.markForCheck()
         } catch {
             // Git not available
@@ -10335,6 +10486,33 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    canMoveContextDocument (delta: number): boolean {
+        const docId = this.docContextMenuDocId
+        if (!docId) { return false }
+        const idx = this.documents.findIndex(d => d.id === docId)
+        if (idx < 0) { return false }
+        const target = idx + delta
+        return target >= 0 && target < this.documents.length
+    }
+
+    moveContextDocument (delta: number): void {
+        const docId = this.docContextMenuDocId
+        this.docContextMenuOpen = false
+        this.docContextMenuDocId = null
+        if (!docId) { return }
+        const idx = this.documents.findIndex(d => d.id === docId)
+        if (idx < 0) { return }
+        const target = idx + delta
+        if (target < 0 || target >= this.documents.length) { return }
+        const arr = this.documents.slice()
+        const [moved] = arr.splice(idx, 1)
+        arr.splice(target, 0, moved)
+        this.documents = arr
+        try { (this as any).updateVisibleTreeItems?.(true) } catch { /* ignore */ }
+        this.persistState()
+        this.cdr.markForCheck()
+    }
+
     async moveDocumentFromContextMenu (folderPath: string|null): Promise<void> {
         const docId = this.docContextMenuDocId
         this.docContextMenuOpen = false
@@ -10872,6 +11050,58 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private isTerminalLikeTab (tab: any): boolean {
         return !!(tab && typeof tab.configure === 'function' && tab.profile)
+    }
+
+    terminalColorSchemePresets: Array<{name: string, scheme: any}> = [
+        { name: 'One Dark', scheme: {
+            name: 'One Dark', foreground: '#abb2bf', background: '#282c34', cursor: '#528bff',
+            colors: ['#282c34','#e06c75','#98c379','#e5c07b','#61afef','#c678dd','#56b6c2','#abb2bf',
+                     '#5c6370','#e06c75','#98c379','#e5c07b','#61afef','#c678dd','#56b6c2','#ffffff'],
+        }},
+        { name: 'Solarized Dark', scheme: {
+            name: 'Solarized Dark', foreground: '#839496', background: '#002b36', cursor: '#93a1a1',
+            colors: ['#073642','#dc322f','#859900','#b58900','#268bd2','#d33682','#2aa198','#eee8d5',
+                     '#002b36','#cb4b16','#586e75','#657b83','#839496','#6c71c4','#93a1a1','#fdf6e3'],
+        }},
+        { name: 'Solarized Light', scheme: {
+            name: 'Solarized Light', foreground: '#657b83', background: '#fdf6e3', cursor: '#586e75',
+            colors: ['#eee8d5','#dc322f','#859900','#b58900','#268bd2','#d33682','#2aa198','#073642',
+                     '#fdf6e3','#cb4b16','#93a1a1','#839496','#657b83','#6c71c4','#586e75','#002b36'],
+        }},
+        { name: 'Monokai', scheme: {
+            name: 'Monokai', foreground: '#f8f8f2', background: '#272822', cursor: '#f8f8f0',
+            colors: ['#272822','#f92672','#a6e22e','#f4bf75','#66d9ef','#ae81ff','#a1efe4','#f8f8f2',
+                     '#75715e','#f92672','#a6e22e','#f4bf75','#66d9ef','#ae81ff','#a1efe4','#f9f8f5'],
+        }},
+        { name: 'GitHub Light', scheme: {
+            name: 'GitHub Light', foreground: '#24292e', background: '#ffffff', cursor: '#24292e',
+            colors: ['#ffffff','#d73a49','#22863a','#b08800','#005cc5','#6f42c1','#1b7c83','#24292e',
+                     '#959da5','#cb2431','#28a745','#dbab09','#0366d6','#5a32a3','#3192aa','#24292e'],
+        }},
+    ]
+
+    applyTerminalColorSchemePreset (name: string): void {
+        const preset = this.terminalColorSchemePresets.find(p => p.name === name)
+        if (!preset) { return }
+        const terms = this.findActiveTerminalTabs()
+        if (!terms.length) {
+            this.setTransientStatus('No terminal open to apply theme', 2000)
+            return
+        }
+        for (const term of terms) {
+            if (!(term as any).profile) { continue }
+            ;(term as any).profile.terminalColorScheme = JSON.parse(JSON.stringify(preset.scheme))
+            try { (term as any).configure() } catch { /* ignore */ }
+        }
+        this.setTransientStatus(`Terminal theme: ${name}`, 2000)
+    }
+
+    private findActiveTerminalTabs (): any[] {
+        const result: any[] = []
+        if (this.runTerminalTab && this.isTerminalLikeTab(this.runTerminalTab)) {
+            result.push(this.runTerminalTab)
+        }
+        return result
     }
 
     private toggleTerminalThemeForTab (term: any): void {
