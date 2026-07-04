@@ -251,6 +251,12 @@ export class Application {
         app.commandLine.appendSwitch('max-active-webgl-contexts', '9000')
         app.commandLine.appendSwitch('lang', 'EN')
 
+        if (process.platform === 'darwin' && !this.configStore.hacks?.disableGPU) {
+            app.commandLine.appendSwitch('enable-features', 'Metal,CanvasOopRasterization')
+            app.commandLine.appendSwitch('enable-zero-copy')
+            app.commandLine.appendSwitch('ignore-gpu-blocklist')
+        }
+
         for (const flag of this.configStore.flags || [['force_discrete_gpu', '0']]) {
             app.commandLine.appendSwitch(flag[0], flag[1])
         }
