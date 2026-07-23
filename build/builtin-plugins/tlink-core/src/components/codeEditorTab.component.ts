@@ -468,7 +468,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     gitStagedCount = 0
     gitUntrackedCount = 0
     private gitStatusTimer?: number
-    private gitStatusRefreshMs = 5000
+    private gitStatusRefreshMs = 15000
     private treeKeyboardActive = false
     private canCloseCheckPromise: Promise<boolean>|null = null
     private confirmedCloseDiscardSignature: string|null = null
@@ -9127,6 +9127,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         void this.refreshGitStatus()
         this.gitStatusTimer = window.setInterval(() => {
+            if (document.hidden || !document.hasFocus()) { return }
             void this.refreshGitStatus()
         }, this.gitStatusRefreshMs)
     }
@@ -9453,6 +9454,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         window.removeEventListener('resize', this.boundOnResize)
         this.detachTopologyWheelListener()
         this.flushTopologyPersist()
+        this.flushPersistState()
         this.stopGitStatusRefresh()
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
@@ -14945,16 +14947,26 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     private queuePersistState (): void {
-        if (this.persistStateTimer) {
-            clearTimeout(this.persistStateTimer)
-        }
-        this.persistStateTimer = window.setTimeout(() => {
-            this.persistStateTimer = undefined
-            this.persistState()
-        }, 250)
+        this.persistState()
     }
 
     private persistState (): void {
+        if (this.persistStateTimer) { return }
+        this.persistStateTimer = window.setTimeout(() => {
+            this.persistStateTimer = undefined
+            this.persistStateNow()
+        }, 500)
+    }
+
+    private flushPersistState (): void {
+        if (this.persistStateTimer) {
+            clearTimeout(this.persistStateTimer)
+            this.persistStateTimer = undefined
+            this.persistStateNow()
+        }
+    }
+
+    private persistStateNow (): void {
         // Save current editor view states before snapshotting
         if (this.activeDocId && this.primaryEditor) {
             const vs = this.primaryEditor.saveViewState?.()
