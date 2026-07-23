@@ -14449,7 +14449,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyZ, () => this.runUndo())
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyZ, () => this.runRedo())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyY, () => this.runRedo())
-        const editScope = 'editorTextFocus && !findWidgetVisible && !suggestWidgetVisible && !renameInputVisible'
+        const editScope = 'editorTextFocus'
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyX, () => this.cutSelection(), editScope)
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyC, () => this.copySelection(), editScope)
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyV, () => this.pasteClipboard(), editScope)
