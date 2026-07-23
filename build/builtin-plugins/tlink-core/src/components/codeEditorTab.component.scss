@@ -2440,6 +2440,23 @@
     border-color: rgba(var(--tlink-editor-selection-rgb, 79, 156, 255), 0.16) !important;
 }
 
+/* Replace Monaco Find widget icons with text labels for Replace / Replace All */
+:host ::ng-deep .monaco-editor .find-widget .replace-actions {
+    .codicon.codicon-find-replace,
+    .codicon.codicon-find-replace-all {
+        width: auto !important;
+        min-width: 44px;
+        padding: 0 8px !important;
+        font-family: inherit !important;
+        font-size: 11px !important;
+        line-height: 20px !important;
+        color: var(--tlink-editor-fg, #cccccc) !important;
+        &::before { display: none !important; }
+    }
+    .codicon.codicon-find-replace::after { content: 'Replace'; }
+    .codicon.codicon-find-replace-all::after { content: 'Replace All'; }
+}
+
 :host ::ng-deep .monaco-editor .focused .selectionHighlight,
 :host ::ng-deep .monaco-editor .selectionHighlight,
 :host ::ng-deep .monaco-editor .wordHighlightText {
