@@ -253,7 +253,7 @@ export class XTermFrontend extends Frontend {
         }
 
         // Allow an animation frame
-        await new Promise(r => setTimeout(r, 100))
+        await new Promise<void>(r => requestAnimationFrame(() => r()))
 
         this.ready.next()
         this.ready.complete()
