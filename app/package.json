@@ -51,7 +51,7 @@
     "@types/ws": "^8.5.10",
     "atomically": "^2.0.2",
     "filesize": "^9",
-    "uuid": "^9.0.1",
+    "uuid": "^14.0.0",
     "ws": "^8.16.0"
   },
   "peerDependencies": {
