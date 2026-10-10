@@ -62,7 +62,7 @@ builder({
         ] : undefined,
         forceCodeSigning: !!keypair,
         win: {
-            artifactName: `tlink-studio-\${version}-portable-\${arch}${artifactSuffix}.\${ext}`,
+            artifactName: `tlink-studio-ngen-editor-\${version}-portable-\${arch}${artifactSuffix}.\${ext}`,
             signtoolOptions: {
                 certificateSha1: process.env.SM_CODE_SIGNING_CERT_SHA1_HASH,
                 publisherName: process.env.SM_PUBLISHER_NAME,
@@ -94,7 +94,7 @@ builder({
             },
         },
         nsis: {
-            artifactName: `tlink-studio-\${version}-setup-\${arch}${artifactSuffix}.\${ext}`,
+            artifactName: `tlink-studio-ngen-editor-\${version}-setup-\${arch}${artifactSuffix}.\${ext}`,
         },
     },
 

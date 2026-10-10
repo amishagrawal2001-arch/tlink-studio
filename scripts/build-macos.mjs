@@ -133,7 +133,7 @@ const macTargets = requestedMacArtifacts.length ? requestedMacArtifacts : ['dmg'
             mac: {
                 identity: !process.env.CI || process.env.CSC_LINK ? undefined : null,
                 notarize: !!process.env.APPLE_TEAM_ID,
-                artifactName: `tlink-studio-\${version}-macos-\${arch}${artifactSuffix}.\${ext}`,
+                artifactName: `tlink-studio-ngen-editor-\${version}-macos-\${arch}${artifactSuffix}.\${ext}`,
             },
             npmRebuild: process.env.ARCH !== 'arm64',
             publish: process.env.KEYGEN_TOKEN ? [

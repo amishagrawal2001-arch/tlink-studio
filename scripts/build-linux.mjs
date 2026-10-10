@@ -52,7 +52,7 @@ builder({
         },
         ...(extraResources ? { extraResources } : {}),
         linux: {
-            artifactName: `tlink-studio-\${version}-linux-\${arch}${artifactSuffix}.\${ext}`,
+            artifactName: `tlink-studio-ngen-editor-\${version}-linux-\${arch}${artifactSuffix}.\${ext}`,
         },
         publish: process.env.KEYGEN_TOKEN ? [
             vars.keygenConfig,
