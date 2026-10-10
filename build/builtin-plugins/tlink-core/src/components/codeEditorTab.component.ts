@@ -11607,6 +11607,11 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private ensureLspProviders (langId: string): void {
         if (!this.monaco || this.lspProvidersRegistered.has(langId)) { return }
+        // Only register for languages Monaco actually knows about —
+        // registering for an unknown id attaches a listener on
+        // onDidChangeLanguages that waits forever, and these leak.
+        const known = this.monaco.languages.getLanguages().some((l: any) => l.id === langId)
+        if (!known) { return }
         this.lspProvidersRegistered.add(langId)
         this.monaco.languages.registerCompletionItemProvider(langId, {
             triggerCharacters: ['.', ':', '/', '"', "'", '_'],
@@ -13373,6 +13378,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (snapshot.viewState) {
             this.editorViewStates.set(docId, snapshot.viewState)
         }
+        // Attach LSP once per doc, deferred so model events are set up first.
+        setTimeout(() => { try { this.attachLspToDoc(doc) } catch { /* ignore */ } }, 0)
         // Track listener subscriptions for explicit disposal to prevent leaks.
         // Guard callbacks: if the model fires during disposal, bail out.
         doc.modelDisposables.push(model.onDidChangeContent(() => {
@@ -14650,7 +14657,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.monaco.editor.setModelLanguage(doc.model, lang)
         doc.languageId = lang
         try { this.applyEditorConfigForDoc(doc) } catch { /* ignore */ }
-        try { this.attachLspToDoc(doc) } catch { /* ignore */ }
+        // LSP attach is driven from createDocument (one-shot), not here —
+        // this method runs in restoreState loops and would re-notify the
+        // server for every doc on every restore pass.
     }
 
     private applyEditorConfigForDoc (doc: EditorDocument): void {
