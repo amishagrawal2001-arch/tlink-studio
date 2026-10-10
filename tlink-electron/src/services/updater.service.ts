@@ -4,7 +4,7 @@ import axios from 'axios'
 import { Logger, LogService, ConfigService, UpdaterService, PlatformService, TranslateService } from 'tlink-core'
 import { ElectronService } from '../services/electron.service'
 
-const UPDATES_URL = 'https://api.github.com/repos/eugeny/tlink/releases/latest'
+const UPDATES_URL = 'https://api.github.com/repos/amishagrawal2001-arch/tlink-studio/releases/latest'
 
 @Injectable()
 export class ElectronUpdaterService extends UpdaterService {

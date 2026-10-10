@@ -1,6 +1,11 @@
 ---
 appId: org.tlink.studio
 productName: Tlink Studio
+publish:
+  provider: github
+  owner: amishagrawal2001-arch
+  repo: tlink-studio
+  releaseType: release
 directories:
   app: app
 compression: normal

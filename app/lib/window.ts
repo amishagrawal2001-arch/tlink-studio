@@ -583,6 +583,9 @@ export class Window {
     private setupUpdater () {
         autoUpdater.autoDownload = true
         autoUpdater.autoInstallOnAppQuit = true
+        // Opt into beta/pre-releases since current channel ships as v1.0.0-beta.X
+        autoUpdater.allowPrerelease = true
+        autoUpdater.channel = 'latest'
 
         autoUpdater.on('update-available', () => {
             this.send('updater:update-available')
