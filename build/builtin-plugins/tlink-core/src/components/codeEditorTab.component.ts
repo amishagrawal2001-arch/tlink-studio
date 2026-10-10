@@ -9,6 +9,7 @@ import { BaseTabComponent, DirectoryUpload, FileUpload, GetRecoveryTokenOptions,
 import { AppService } from '../services/app.service'
 import { TabsService } from '../services/tabs.service'
 import { ProfilesService } from '../services/profiles.service'
+import { LspService, DEFAULT_LSP_CONFIGS } from '../services/lsp.service'
 import { SplitTabComponent } from './splitTab.component'
 type TerminalServiceType = any
 type BaseTerminalTabComponentType = any
@@ -415,6 +416,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     formatOnSave = false
     autosaveOnBlur = true
     zenMode = false
+    lspService = new LspService()
+    private lspDiagnosticDisposers = new Map<string, () => void>()
+    private lspChangeDebounce = new Map<string, any>()
+    private lspProvidersRegistered = new Set<string>()
     topologyMarqueeActive = false
     topologyMarqueeLeftPx = 0
     topologyMarqueeTopPx = 0
@@ -9491,6 +9496,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.flushTopologyPersist()
         this.flushPersistState()
         this.stopGitStatusRefresh()
+        try { this.lspService.shutdownAll() } catch { /* ignore */ }
         // Flush any pending debounced folder state first, then persist full state.
         if (this.persistFoldersTimer) {
             clearTimeout(this.persistFoldersTimer)
@@ -11528,6 +11534,119 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    get activeLspStatus (): 'running' | 'failed' | '' {
+        const doc = this.cachedActiveDoc
+        if (!doc?.languageId) { return '' }
+        if (!this.lspService.findConfigForLanguage(doc.languageId)) { return '' }
+        const s = this.lspService.serverStatus(doc.languageId)
+        return s === 'off' ? '' : s
+    }
+
+    private initLspService (): void {
+        if (!this.lspService.isAvailable()) { return }
+        try {
+            const fsSync = (window as any).require?.('fs')
+            const osMod = (window as any).require?.('os')
+            if (!fsSync || !osMod) { return }
+            const cfgPath = path.join(osMod.homedir(), '.config', 'tlink-studio', 'lsp.json')
+            let configs = DEFAULT_LSP_CONFIGS
+            try {
+                const raw = fsSync.readFileSync(cfgPath, 'utf8')
+                const parsed = JSON.parse(raw)
+                if (Array.isArray(parsed)) { configs = parsed }
+            } catch { /* use defaults */ }
+            this.lspService.setConfigs(configs)
+        } catch { /* ignore */ }
+    }
+
+    private attachLspToDoc (doc: EditorDocument): void {
+        if (!doc?.path || !doc.languageId || !doc.model) { return }
+        const spec = this.lspService.findConfigForLanguage(doc.languageId)
+        if (!spec) { return }
+        const uri = 'file://' + doc.path
+        void this.lspService.openDocument(doc.languageId, uri, doc.model.getValue())
+        this.ensureLspProviders(doc.languageId)
+        // Wire diagnostics -> Monaco markers
+        if (!this.lspDiagnosticDisposers.has(doc.languageId)) {
+            const dispose = this.lspService.onDiagnostics(doc.languageId, (diagUri, diagnostics) => {
+                const target = this.documents.find(d => d.path && ('file://' + d.path) === diagUri)
+                if (!target?.model) { return }
+                const markers = diagnostics.map((d: any) => ({
+                    severity: d.severity === 1 ? 8 : d.severity === 2 ? 4 : d.severity === 3 ? 2 : 1,
+                    message: d.message ?? '',
+                    source: d.source || 'lsp',
+                    startLineNumber: (d.range?.start?.line ?? 0) + 1,
+                    startColumn: (d.range?.start?.character ?? 0) + 1,
+                    endLineNumber: (d.range?.end?.line ?? 0) + 1,
+                    endColumn: (d.range?.end?.character ?? 0) + 1,
+                }))
+                try { this.monaco.editor.setModelMarkers(target.model, 'lsp', markers) } catch { /* ignore */ }
+                this.refreshMarkers()
+                this.cdr.markForCheck()
+            })
+            this.lspDiagnosticDisposers.set(doc.languageId, dispose)
+        }
+    }
+
+    private sendLspChange (doc: EditorDocument): void {
+        if (!doc?.path || !doc.languageId) { return }
+        if (!this.lspService.findConfigForLanguage(doc.languageId)) { return }
+        const key = doc.id
+        if (this.lspChangeDebounce.get(key)) { clearTimeout(this.lspChangeDebounce.get(key)) }
+        this.lspChangeDebounce.set(key, setTimeout(() => {
+            this.lspChangeDebounce.delete(key)
+            if (!doc.model || !doc.path) { return }
+            void this.lspService.changeDocument(doc.languageId, 'file://' + doc.path, doc.model.getValue())
+        }, 300))
+    }
+
+    private ensureLspProviders (langId: string): void {
+        if (!this.monaco || this.lspProvidersRegistered.has(langId)) { return }
+        this.lspProvidersRegistered.add(langId)
+        this.monaco.languages.registerCompletionItemProvider(langId, {
+            triggerCharacters: ['.', ':', '/', '"', "'", '_'],
+            provideCompletionItems: async (model: any, position: any) => {
+                const uri = model.uri?.toString?.() ?? ''
+                if (!uri.startsWith('file://')) { return { suggestions: [] } }
+                try {
+                    const result = await this.lspService.completion(langId, uri, position.lineNumber - 1, position.column - 1)
+                    const items = Array.isArray(result) ? result : (result?.items ?? [])
+                    const monaco = this.monaco
+                    return {
+                        suggestions: items.slice(0, 200).map((item: any) => ({
+                            label: item.label,
+                            kind: monaco.languages.CompletionItemKind.Variable,
+                            insertText: item.insertText ?? item.label,
+                            detail: item.detail,
+                            documentation: typeof item.documentation === 'string' ? item.documentation : item.documentation?.value,
+                            sortText: item.sortText ?? item.label,
+                            filterText: item.filterText ?? item.label,
+                            range: {
+                                startLineNumber: position.lineNumber,
+                                endLineNumber: position.lineNumber,
+                                startColumn: position.column,
+                                endColumn: position.column,
+                            },
+                        })),
+                    }
+                } catch { return { suggestions: [] } }
+            },
+        })
+        this.monaco.languages.registerHoverProvider(langId, {
+            provideHover: async (model: any, position: any) => {
+                const uri = model.uri?.toString?.() ?? ''
+                if (!uri.startsWith('file://')) { return null }
+                try {
+                    const result = await this.lspService.hover(langId, uri, position.lineNumber - 1, position.column - 1)
+                    if (!result?.contents) { return null }
+                    const content = Array.isArray(result.contents) ? result.contents : [result.contents]
+                    const text = content.map((c: any) => typeof c === 'string' ? c : c.value).filter(Boolean).join('\n\n')
+                    return text ? { contents: [{ value: text }] } : null
+                } catch { return null }
+            },
+        })
+    }
+
     refreshMarkers (): void {
         if (!this.monaco) { return }
         const doc = this.cachedActiveDoc
@@ -13014,6 +13133,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private async initializeEditor (): Promise<void> {
         try {
+            this.initLspService()
             this.loadFoldersFromState()
         // Don't call updateTreeItems here - it will be called in ngAfterViewInit
         // to avoid ExpressionChangedAfterItHasBeenCheckedError
@@ -13194,6 +13314,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             // every keystroke — it caused visible re-tokenization "color flashing"
             // and read the full file for each change. Detection happens on open
             // and when switching tabs via setModelLanguage.
+            this.sendLspChange(doc)
             this.updateTitle(doc)
             this.updateStatus()
             this.queuePersistState()
@@ -14460,6 +14581,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         this.monaco.editor.setModelLanguage(doc.model, lang)
         doc.languageId = lang
         try { this.applyEditorConfigForDoc(doc) } catch { /* ignore */ }
+        try { this.attachLspToDoc(doc) } catch { /* ignore */ }
     }
 
     private applyEditorConfigForDoc (doc: EditorDocument): void {

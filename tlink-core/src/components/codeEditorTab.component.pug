@@ -1192,6 +1192,7 @@
                 span.git-count.git-untracked(*ngIf='gitUntrackedCount') ?{{gitUntrackedCount}}
             span {{statusLineCol}}
             span.status-lang-picker(title='Change language', style='cursor: pointer;', (click)='openLanguagePicker()') {{statusLanguage}}
+            span.lsp-status(*ngIf='activeLspStatus', [class.lsp-running]='activeLspStatus==="running"', [class.lsp-failed]='activeLspStatus==="failed"', title='Language server status') LSP:{{activeLspStatus}}
             span {{statusEOL}}
             span {{statusIndent}}
             span {{statusEncoding}}

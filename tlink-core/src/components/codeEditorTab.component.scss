@@ -2444,6 +2444,15 @@
     .editor-toolbar, .code-editor-sidebar, .sidebar-resizer, .code-editor-status { display: none !important; }
 }
 
+.lsp-status {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    &.lsp-running { color: #4caf50; }
+    &.lsp-failed  { color: #e06c75; }
+}
+
 /* Replace Monaco Find widget icons with text labels for Replace / Replace All */
 :host ::ng-deep .monaco-editor .find-widget .replace-actions {
     .codicon.codicon-find-replace,
