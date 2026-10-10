@@ -8,7 +8,10 @@ try {
     release = require('@electron/remote').app.getVersion()
 }
 
-if (!process.env.TLINK_DEV) {
+// Default: Sentry disabled. Opt in with TLINK_ENABLE_SENTRY=1.
+// Sentry hooks every exception/breadcrumb/perf-mark; disabling it eliminates
+// a measurable packaged-vs-dev perf gap.
+if (process.env.TLINK_ENABLE_SENTRY && !process.env.TLINK_DEV) {
     init({
         dsn: SENTRY_DSN,
         release,
