@@ -257,7 +257,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     editingDocId: string|null = null
     editingDocName = ''
     wordWrapEnabled = true
-    minimapEnabled = false
+    minimapEnabled = true
     themeMode: EditorThemeMode = 'auto'
     editorThemeColor = '#4f9cff'
     private readonly syncAppThemeWithEditor = process.env.TLINK_STUDIO_APP === '1' || !!(window as any).__codeEditorFullWindowMode
@@ -14773,6 +14773,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             clearInterval(this.externalWatchTimer)
         }
         this.externalWatchTimer = window.setInterval(() => {
+            if (document.hidden || !document.hasFocus()) { return }
             void this.checkExternalChangeTick()
         }, this.externalWatchIntervalMs)
     }
