@@ -845,6 +845,13 @@
                 span.global-search-count {{globalSearchResultCount}} {{globalSearchResultCount === 1 ? 'result' : 'results'}}
                 button.btn.btn-sm.btn-link.global-search-close(type='button', (click)='toggleGlobalSearch()')
                     i.fas.fa-times
+            .global-search-options
+                button.gso-btn(type='button', title='Match case', [class.active]='globalSearchCaseSensitive', (click)='toggleGlobalSearchFlag("case")') Aa
+                button.gso-btn(type='button', title='Whole word', [class.active]='globalSearchWholeWord', (click)='toggleGlobalSearchFlag("word")') ab
+                button.gso-btn(type='button', title='Regular expression', [class.active]='globalSearchRegex', (click)='toggleGlobalSearchFlag("regex")') .*
+            .global-search-replace
+                input.form-control.form-control-sm.global-search-replace-input(type='text', placeholder='Replace…', [value]='globalSearchReplace', (input)='globalSearchReplace=$event.target.value')
+                button.btn.btn-sm.btn-outline-secondary(type='button', [disabled]='!globalSearchResultCount', (click)='replaceAllInGlobalResults()') Replace All
             .global-search-results
                 .global-search-result(*ngFor='let result of globalSearchResults', (click)='goToGlobalSearchResult(result)')
                     .global-search-file

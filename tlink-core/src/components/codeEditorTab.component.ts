@@ -359,6 +359,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     // Multi-file search
     showGlobalSearch = false
+    globalSearchRegex = false
+    globalSearchCaseSensitive = false
+    globalSearchWholeWord = false
+    globalSearchReplace = ''
 
     // Markdown preview
     showMarkdownPreview = false
@@ -12529,7 +12533,15 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         for (const doc of this.documents) {
             if (count >= maxResults) { break }
             if (!this.isModelAlive(doc)) { continue }
-            const matches = doc.model.findMatches(query, true, false, false, null, false, maxResults - count)
+            const matches = doc.model.findMatches(
+                query,
+                true,
+                this.globalSearchRegex,
+                this.globalSearchCaseSensitive,
+                this.globalSearchWholeWord ? '\\b' : null,
+                false,
+                maxResults - count,
+            )
             for (const match of matches) {
                 if (count >= maxResults) { break }
                 const lineContent = doc.model.getLineContent(match.range.startLineNumber)
@@ -12547,6 +12559,51 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         this.globalSearchResultCount = count
         this.cdr.markForCheck()
+    }
+
+    toggleGlobalSearchFlag (flag: 'regex' | 'case' | 'word'): void {
+        if (flag === 'regex') this.globalSearchRegex = !this.globalSearchRegex
+        else if (flag === 'case') this.globalSearchCaseSensitive = !this.globalSearchCaseSensitive
+        else if (flag === 'word') this.globalSearchWholeWord = !this.globalSearchWholeWord
+        this.runGlobalSearch(this.globalSearchQuery)
+    }
+
+    async replaceAllInGlobalResults (): Promise<void> {
+        if (!this.globalSearchQuery || this.globalSearchResults.length === 0) { return }
+        const replacement = this.globalSearchReplace ?? ''
+        const grouped = new Map<string, EditorDocument>()
+        for (const r of this.globalSearchResults) {
+            const d = this.documents.find(x => x.id === r.docId)
+            if (d && !grouped.has(r.docId)) { grouped.set(r.docId, d) }
+        }
+        if (grouped.size === 0) { return }
+        const confirmed = await this.platform.showMessageBox({
+            type: 'warning',
+            message: `Replace ${this.globalSearchResultCount} match${this.globalSearchResultCount === 1 ? '' : 'es'} in ${grouped.size} file${grouped.size === 1 ? '' : 's'}?`,
+            detail: `Replace "${this.globalSearchQuery}" with "${replacement}".`,
+            buttons: ['Replace', 'Cancel'],
+            defaultId: 0,
+            cancelId: 1,
+        })
+        if (confirmed.response !== 0) { return }
+        let totalReplaced = 0
+        for (const doc of grouped.values()) {
+            if (!this.isModelAlive(doc)) { continue }
+            const matches = doc.model.findMatches(
+                this.globalSearchQuery,
+                true,
+                this.globalSearchRegex,
+                this.globalSearchCaseSensitive,
+                this.globalSearchWholeWord ? '\\b' : null,
+                false,
+            )
+            if (matches.length === 0) { continue }
+            const edits = matches.map((m: any) => ({ range: m.range, text: replacement, forceMoveMarkers: true }))
+            doc.model.pushEditOperations([], edits, () => null)
+            totalReplaced += matches.length
+        }
+        this.setTransientStatus(`Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? '' : 's'}`, 2500)
+        this.runGlobalSearch(this.globalSearchQuery)
     }
 
     goToGlobalSearchResult (result: any): void {
@@ -14674,7 +14731,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyO, () => this.openFile())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyN, () => this.newFile())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyF, () => this.runFind())
-        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyF, () => this.runReplace())
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyF, () => this.toggleGlobalSearch())
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyF, () => this.runReplace())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyG, () => this.goToLine())
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyO, () => {
             editor.getAction?.('editor.action.quickOutline')?.run?.()

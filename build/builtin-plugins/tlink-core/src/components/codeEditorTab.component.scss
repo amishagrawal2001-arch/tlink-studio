@@ -2141,6 +2141,29 @@
     flex-direction: column;
     flex-shrink: 0;
 
+    .global-search-options {
+        display: flex;
+        gap: 4px;
+        padding: 2px 10px 6px;
+        .gso-btn {
+            padding: 2px 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            color: var(--theme-fg-less);
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            &:hover { background: rgba(255,255,255,0.1); }
+            &.active { background: rgba(100,180,255,0.25); color: #fff; border-color: rgba(100,180,255,0.5); }
+        }
+    }
+    .global-search-replace {
+        display: flex;
+        gap: 6px;
+        padding: 2px 10px 8px;
+        align-items: center;
+        .global-search-replace-input { flex: 1; min-width: 120px; }
+    }
     .global-search-header {
         display: flex;
         align-items: center;
