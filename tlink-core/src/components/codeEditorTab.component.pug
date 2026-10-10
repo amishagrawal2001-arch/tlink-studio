@@ -825,6 +825,9 @@
                 button(type='button', (click)='handleFileContextAction("open")') Open
                 button(type='button', (click)='handleFileContextAction("rename")') Rename…
                 button(type='button', (click)='handleFileContextAction("show")') Show in Finder/Explorer
+                button(type='button', (click)='handleFileContextAction("copyFilename")') Copy filename
+                button(type='button', (click)='handleFileContextAction("copyRelativePath")') Copy relative path
+                button(type='button', (click)='handleFileContextAction("copyAbsolutePath")') Copy absolute path
                 button(type='button', (click)='handleFileContextAction("duplicate")') {{selectionContextDuplicateLabel}}
                 button(type='button', (click)='handleFileContextAction("move")') {{selectionContextMoveLabel}}
                 button(type='button', (click)='handleFileContextAction("delete")') {{selectionContextDeleteLabel}}

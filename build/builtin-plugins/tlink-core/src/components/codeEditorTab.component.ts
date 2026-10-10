@@ -231,6 +231,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private static monacoQuickPickGuardInstalled = false
     @HostBinding('class.code-editor-tab') hostClass = true
     @HostBinding('class.platform-darwin') platformClassMacOS = process.platform === 'darwin'
+    @HostBinding('class.zen-mode') get zenModeClass (): boolean { return this.zenMode }
     @HostBinding('style.--tlink-editor-selection-rgb')
     get editorSelectionRgb (): string {
         const rgb = this.hexToRgb(this.editorThemeColor)
@@ -412,6 +413,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyPanY = 0
     showTopologyMinimap = true
     formatOnSave = false
+    autosaveOnBlur = true
+    zenMode = false
     topologyMarqueeActive = false
     topologyMarqueeLeftPx = 0
     topologyMarqueeTopPx = 0
@@ -2455,6 +2458,28 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             await this.moveSelectionToFolderPrompt(fileTargets, folderTargets)
         } else if (action === 'delete') {
             await this.deleteSelectionOnDisk(fileTargets, folderTargets)
+        } else if (action === 'copyFilename') {
+            await this.copyToSystemClipboard(path.basename(filePath))
+            this.setTransientStatus('Copied filename', 1200)
+        } else if (action === 'copyAbsolutePath') {
+            await this.copyToSystemClipboard(path.resolve(filePath))
+            this.setTransientStatus('Copied absolute path', 1200)
+        } else if (action === 'copyRelativePath') {
+            const base = this.folders?.[0]?.path || ''
+            const rel = base ? path.relative(base, filePath) : path.basename(filePath)
+            await this.copyToSystemClipboard(rel || path.basename(filePath))
+            this.setTransientStatus('Copied relative path', 1200)
+        }
+    }
+
+    private async copyToSystemClipboard (text: string): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(text)
+        } catch {
+            try {
+                const { clipboard } = (window as any).require?.('electron') ?? {}
+                clipboard?.writeText?.(text)
+            } catch { /* ignore */ }
         }
     }
 
@@ -9422,6 +9447,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private boundOnMouseup = () => this.endSidebarDrag()
     private boundOnResize = () => this.onWindowResize()
     private boundOnWheel = (e: WheelEvent) => this.onTopologyCanvasWheel(e)
+    private boundOnWindowBlur = () => this.onWindowBlur()
+
+    private onWindowBlur (): void {
+        if (!this.autosaveOnBlur) { return }
+        const dirty = this.documents.filter(d => d.isDirty && d.path)
+        if (!dirty.length) { return }
+        void this.saveAllFiles()
+    }
     private wheelRafPending = false
     private wheelAccumZoomFactor = 1
     private wheelLastClientX = 0
@@ -9436,6 +9469,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             document.addEventListener('mousemove', this.boundOnMousemove)
             document.addEventListener('mouseup', this.boundOnMouseup)
             window.addEventListener('resize', this.boundOnResize)
+            window.addEventListener('blur', this.boundOnWindowBlur)
         })
 
         // Update tree items after initialization to avoid ExpressionChangedAfterItHasBeenCheckedError
@@ -9452,6 +9486,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         document.removeEventListener('mousemove', this.boundOnMousemove)
         document.removeEventListener('mouseup', this.boundOnMouseup)
         window.removeEventListener('resize', this.boundOnResize)
+        window.removeEventListener('blur', this.boundOnWindowBlur)
         this.detachTopologyWheelListener()
         this.flushTopologyPersist()
         this.flushPersistState()
@@ -9756,6 +9791,13 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     }
 
     docMruTimes = new Map<string, number>()
+
+    toggleZenMode (): void {
+        this.zenMode = !this.zenMode
+        this.setTransientStatus(`Zen mode: ${this.zenMode ? 'on' : 'off'}`, 1200)
+        this.cdr.markForCheck()
+        setTimeout(() => this.primaryEditor?.layout?.(), 50)
+    }
 
     async openLanguagePicker (): Promise<void> {
         if (!(await this.ensureEditor())) { return }
@@ -14519,6 +14561,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyL, () => this.cycleLineNumbersStyle())
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyT, () => void this.reopenClosed())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyE, () => this.openRecentFilesSwitcher())
+        if (this.monaco?.KeyMod && this.monaco?.KeyCode) {
+            const chord = (this.monaco as any).KeyMod.chord
+                ? (this.monaco as any).KeyMod.chord(KeyMod.CtrlCmd | KeyCode.KeyK, KeyCode.KeyZ)
+                : null
+            if (chord) {
+                editor.addCommand(chord, () => this.toggleZenMode())
+            }
+        }
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, () => this.runActiveFile())
         this.registerEditorContextActions(editor)
         this.registerEditorMouseSelectionFallback(editor)

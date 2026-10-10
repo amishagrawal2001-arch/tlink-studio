@@ -2440,6 +2440,10 @@
     border-color: rgba(var(--tlink-editor-selection-rgb, 79, 156, 255), 0.16) !important;
 }
 
+:host.zen-mode {
+    .editor-toolbar, .code-editor-sidebar, .sidebar-resizer, .code-editor-status { display: none !important; }
+}
+
 /* Replace Monaco Find widget icons with text labels for Replace / Replace All */
 :host ::ng-deep .monaco-editor .find-widget .replace-actions {
     .codicon.codicon-find-replace,
