@@ -10835,8 +10835,9 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     toggleMinimap (): void {
         this.minimapEnabled = !this.minimapEnabled
-        this.primaryEditor?.updateOptions({ minimap: { enabled: this.minimapEnabled } })
-        this.splitEditor?.updateOptions({ minimap: { enabled: this.minimapEnabled } })
+        const minimapOpts = { enabled: this.minimapEnabled, renderCharacters: false, maxColumn: 120, scale: 1 }
+        this.primaryEditor?.updateOptions({ minimap: minimapOpts })
+        this.splitEditor?.updateOptions({ minimap: minimapOpts })
         this.persistState()
     }
 
@@ -13291,7 +13292,6 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     private editorOptions (): any {
         return {
             automaticLayout: true,
-            minimap: { enabled: this.minimapEnabled },
             theme: this.currentThemeId(),
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
             // Stop scrolling once the last line is in view — no infinite empty space below.
@@ -13313,6 +13313,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             bracketPairColorization: { enabled: this.editorBracketColorization },
             renderWhitespace: this.editorRenderWhitespace,
             smoothScrolling: this.editorSmoothScrolling,
+            // Perf: font-rendered whitespace is cheaper than SVG, and
+            // disableLayerHinting prevents extra composite layers on scroll.
+            experimentalWhitespaceRendering: 'font' as any,
+            fastScrollSensitivity: 5,
+            mouseWheelScrollSensitivity: 1,
+            disableLayerHinting: true,
+            minimap: {
+                enabled: this.minimapEnabled,
+                renderCharacters: false,
+                maxColumn: 120,
+                scale: 1,
+            },
             lineNumbers: this.editorLineNumbersStyle,
             columnSelection: this.columnSelectionMode,
             multiCursorModifier: 'alt',
@@ -15531,7 +15543,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
         this.primaryEditor?.updateOptions({
             wordWrap: this.wordWrapEnabled ? 'on' : 'off',
-            minimap: { enabled: this.minimapEnabled },
+            minimap: { enabled: this.minimapEnabled, renderCharacters: false, maxColumn: 120, scale: 1 },
             fontSize: this.fontSize,
             lineHeight: this.lineHeight,
         })
