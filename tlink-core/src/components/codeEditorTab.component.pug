@@ -1188,7 +1188,7 @@
                 span.git-count.git-staged(*ngIf='gitStagedCount') S{{gitStagedCount}}
                 span.git-count.git-untracked(*ngIf='gitUntrackedCount') ?{{gitUntrackedCount}}
             span {{statusLineCol}}
-            span {{statusLanguage}}
+            span.status-lang-picker(title='Change language', style='cursor: pointer;', (click)='openLanguagePicker()') {{statusLanguage}}
             span {{statusEOL}}
             span {{statusIndent}}
             span {{statusEncoding}}

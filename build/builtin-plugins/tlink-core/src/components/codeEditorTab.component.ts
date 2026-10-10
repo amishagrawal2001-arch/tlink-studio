@@ -9755,6 +9755,55 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         }
     }
 
+    docMruTimes = new Map<string, number>()
+
+    async openLanguagePicker (): Promise<void> {
+        if (!(await this.ensureEditor())) { return }
+        const doc = this.documents.find(d => d.id === this.activeDocId)
+        if (!doc?.model) { return }
+        const langs = this.monaco?.languages.getLanguages() ?? []
+        const options: SelectorOption<string>[] = langs
+            .map((l: any) => ({
+                name: l.aliases?.[0] || l.id,
+                description: l.extensions?.join(' ') || l.id,
+                group: 'Language',
+                result: l.id as string,
+                weight: l.id === doc.languageId ? -100 : 0,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        const picked = await this.app.showSelector<string>('Select Language', options).catch(() => null)
+        if (!picked) { return }
+        this.monaco.editor.setModelLanguage(doc.model, picked)
+        doc.languageId = picked
+        this.updateStatus()
+        this.cdr.markForCheck()
+    }
+
+    async openRecentFilesSwitcher (): Promise<void> {
+        if (!(await this.ensureEditor())) { return }
+        const sorted = [...this.documents].sort((a, b) => {
+            const ta = this.docMruTimes.get(a.id) ?? 0
+            const tb = this.docMruTimes.get(b.id) ?? 0
+            if (ta === tb) return a.name.localeCompare(b.name)
+            return tb - ta
+        }).slice(0, 10)
+        if (!sorted.length) {
+            this.setTransientStatus('No recent files', 1500)
+            return
+        }
+        const options: SelectorOption<string>[] = sorted.map((doc, idx) => ({
+            name: doc.isDirty ? `${doc.name} •` : doc.name,
+            description: doc.path ?? 'Unsaved buffer',
+            group: 'Recent',
+            result: doc.id,
+            weight: idx,
+        }))
+        const picked = await this.app.showSelector<string>('Recent files', options).catch(() => null)
+        if (picked) {
+            this.activateDoc(picked)
+        }
+    }
+
     async openQuickOpen (): Promise<void> {
         if (!(await this.ensureEditor())) {
             return
@@ -12801,6 +12850,7 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         if (!doc) {
             return
         }
+        this.docMruTimes.set(docId, Date.now())
         const docTreePath = doc.path ?? doc.tempPath ?? null
         if (syncTreeSelection) {
             this.setFileSelection(docTreePath ? [docTreePath] : [])
@@ -14467,6 +14517,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         })
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyP, () => this.openCommandPalette())
         editor.addCommand(KeyMod.CtrlCmd | KeyMod.Alt | KeyCode.KeyL, () => this.cycleLineNumbersStyle())
+        editor.addCommand(KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyT, () => void this.reopenClosed())
+        editor.addCommand(KeyMod.CtrlCmd | KeyCode.KeyE, () => this.openRecentFilesSwitcher())
         editor.addCommand(KeyMod.CtrlCmd | KeyCode.Enter, () => this.runActiveFile())
         this.registerEditorContextActions(editor)
         this.registerEditorMouseSelectionFallback(editor)
