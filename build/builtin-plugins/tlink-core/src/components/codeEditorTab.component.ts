@@ -13098,13 +13098,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             try {
                 doc.isDirty = doc.model.getValue() !== doc.lastSavedValue
             } catch { return }  // Model disposed — bail
-            if (doc.languageId === 'plaintext') {
-                const detected = this.detectLanguageFromContent(doc.model.getValue())
-                if (detected && detected !== 'plaintext') {
-                    this.monaco.editor.setModelLanguage(doc.model, detected)
-                    doc.languageId = detected
-                }
-            }
+            // Note: language auto-detection is intentionally not run here on
+            // every keystroke — it caused visible re-tokenization "color flashing"
+            // and read the full file for each change. Detection happens on open
+            // and when switching tabs via setModelLanguage.
             this.updateTitle(doc)
             this.updateStatus()
             this.queuePersistState()
