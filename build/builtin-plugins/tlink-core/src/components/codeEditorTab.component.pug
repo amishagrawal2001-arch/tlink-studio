@@ -820,7 +820,8 @@
                 button(type='button', (click)='handleFolderContextAction("scopeToggle")', [disabled]='!folderContextScopeRoot') {{folderScopeToggleLabel}}
                 button(type='button', (click)='handleFolderContextAction("duplicate")') {{selectionContextDuplicateLabel}}
                 button(type='button', (click)='handleFolderContextAction("move")') {{selectionContextMoveLabel}}
-                button(type='button', (click)='handleFolderContextAction("delete")', [disabled]='!canDeleteFolderContextSelection') {{selectionContextDeleteLabel}}
+                button(type='button', (click)='handleFolderContextAction("removeFromList")') Remove from list (keep on disk)
+                button(type='button', (click)='handleFolderContextAction("delete")', [disabled]='!canDeleteFolderContextSelection') Move to Trash…
             .dropdown-menu.doc-context-menu(*ngIf='fileContextMenuOpen', [style.left.px]='fileContextMenuX', [style.top.px]='fileContextMenuY', (click)='$event.stopPropagation()')
                 button(type='button', (click)='handleFileContextAction("open")') Open
                 button(type='button', (click)='handleFileContextAction("rename")') Rename…
@@ -830,7 +831,8 @@
                 button(type='button', (click)='handleFileContextAction("copyAbsolutePath")') Copy absolute path
                 button(type='button', (click)='handleFileContextAction("duplicate")') {{selectionContextDuplicateLabel}}
                 button(type='button', (click)='handleFileContextAction("move")') {{selectionContextMoveLabel}}
-                button(type='button', (click)='handleFileContextAction("delete")') {{selectionContextDeleteLabel}}
+                button(type='button', (click)='handleFileContextAction("removeFromList")') Remove from list (keep on disk)
+                button(type='button', (click)='handleFileContextAction("delete")') Move to Trash…
             .dropdown-menu.doc-context-menu(*ngIf='docContextMenuOpen', [style.left.px]='docContextMenuX', [style.top.px]='docContextMenuY', (click)='$event.stopPropagation()')
                 button(type='button', (click)='renameDocumentFromContextMenu()') Rename…
                 button(type='button', (click)='moveContextDocument(-1)', [disabled]='!canMoveContextDocument(-1)') Move Up

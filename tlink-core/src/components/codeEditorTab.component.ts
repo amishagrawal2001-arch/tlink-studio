@@ -2429,7 +2429,41 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             await this.moveSelectionToFolderPrompt(fileTargets, folderTargets)
         } else if (action === 'delete') {
             await this.deleteSelectionOnDisk(fileTargets, folderTargets)
+        } else if (action === 'removeFromList') {
+            await this.removeFoldersFromList(folderTargets)
+            if (fileTargets.length) { await this.removeFilesFromList(fileTargets) }
         }
+    }
+
+    /** Remove folder(s) from the workspace list and tree without touching disk. */
+    private async removeFoldersFromList (folderPaths: string[]): Promise<void> {
+        if (!folderPaths.length) { return }
+        for (const folderPath of folderPaths) {
+            if (this.isProtectedWorkspaceFolder(folderPath)) {
+                this.setError(`Cannot remove protected folder: ${folderPath}`)
+                continue
+            }
+            // Close any docs under this folder; closeDocument prompts on dirty.
+            const docsUnder = this.documents.filter(d => {
+                const p = d.path ?? d.tempPath ?? null
+                if (!p) { return false }
+                return this.isSameFsPath(p, folderPath) || p.startsWith(folderPath + path.sep)
+            })
+            for (const doc of docsUnder) {
+                await this.closeDocument(doc.id)
+            }
+            // Remove from workspace list if it's a root; otherwise hide from tree.
+            if (this.folders.find(f => this.isSameFsPath(f.path, folderPath))) {
+                this.removeFolder(folderPath)
+            } else {
+                this.hideTreePath(folderPath)
+            }
+        }
+        this.updateTreeItems()
+        this.persistFolders()
+        this.persistState()
+        this.setTransientStatus(`Removed ${folderPaths.length} folder${folderPaths.length === 1 ? '' : 's'} from list`, 1500)
+        this.cdr.markForCheck()
     }
 
     async handleFileContextAction (action: string): Promise<void> {
@@ -2478,7 +2512,27 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             const rel = base ? path.relative(base, filePath) : path.basename(filePath)
             await this.copyToSystemClipboard(rel || path.basename(filePath))
             this.setTransientStatus('Copied relative path', 1200)
+        } else if (action === 'removeFromList') {
+            await this.removeFilesFromList(fileTargets)
         }
+    }
+
+    /** Remove file(s) from the tree/open-docs list without touching disk. */
+    private async removeFilesFromList (filePaths: string[]): Promise<void> {
+        if (!filePaths.length) { return }
+        // Close any open docs for these paths; prompt on dirty.
+        for (const filePath of filePaths) {
+            const doc = this.documents.find(d => this.isSameFsPath(d.path, filePath) || this.isSameFsPath(d.tempPath ?? null, filePath))
+            if (doc) {
+                await this.closeDocument(doc.id)  // honors confirmDiscard
+            }
+            // Hide from tree so it doesn't reappear on next rebuild.
+            this.hideTreePath(filePath)
+        }
+        this.updateTreeItems()
+        this.persistState()
+        this.setTransientStatus(`Removed ${filePaths.length} item${filePaths.length === 1 ? '' : 's'} from list`, 1500)
+        this.cdr.markForCheck()
     }
 
     private async copyToSystemClipboard (text: string): Promise<void> {
