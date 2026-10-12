@@ -421,7 +421,7 @@ export async function loadPlugins (foundPlugins: PluginInfo[], progress: Progres
                 if (!hasNgModule) {
                     console.warn(`Skipping ${foundPlugin.name}: not an Angular module`)
                     setProgress()
-                    setTimeout(x, 50)
+                    x(undefined)
                     return
                 }
                 pluginModule.pluginName = foundPlugin.name
@@ -431,7 +431,7 @@ export async function loadPlugins (foundPlugins: PluginInfo[], progress: Progres
                 console.error(`Could not load ${foundPlugin.name}:`, error)
             }
             setProgress()
-            setTimeout(x, 50)
+            x(undefined)
         }))
     }
     await Promise.all(pluginsPromises)
