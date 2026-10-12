@@ -2872,25 +2872,53 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 this.setError('No deletable files or folders selected')
                 return
             }
-            if (this.simpleDiskMode) {
-                await this.deleteSelectionOnDiskSimple(fileTargets, folderTargets)
-                return
+            // Containment check: refuse any target that resolves outside
+            // the workspace folders. Prevents accidental deletion of
+            // ancestors (home dir, drive root) via a mis-crafted path.
+            const inScope = (p: string) => {
+                if (!p) { return false }
+                const abs = path.resolve(p)
+                if (this.isProtectedWorkspaceFolder(abs)) { return false }
+                if (!this.folders.length) { return true }
+                return this.folders.some(f => {
+                    const root = path.resolve(f.path)
+                    return abs === root || abs.startsWith(root + path.sep)
+                })
             }
-            if (!this.simpleDiskMode) {
-                const detailParts: string[] = []
-                if (fileTargets.length) {
-                    detailParts.push(`${fileTargets.length} file${fileTargets.length === 1 ? '' : 's'}`)
-                }
-                if (folderTargets.length) {
-                    detailParts.push(`${folderTargets.length} folder${folderTargets.length === 1 ? '' : 's'}`)
-                }
-                if (!(await this.confirmAction(
-                    `Delete ${total} item${total === 1 ? '' : 's'}?`,
-                    `This action cannot be undone and will remove ${detailParts.join(' and ')}.`,
-                    'Delete',
-                ))) {
-                    return
-                }
+            const safeFiles = fileTargets.filter(inScope)
+            const safeFolders = folderTargets.filter(inScope)
+            const rejectedCount = (fileTargets.length - safeFiles.length) + (folderTargets.length - safeFolders.length)
+            if (rejectedCount) {
+                this.setError(`Refused to delete ${rejectedCount} item${rejectedCount === 1 ? '' : 's'} outside workspace`)
+            }
+            if (!safeFiles.length && !safeFolders.length) { return }
+
+            // Warn about unsaved edits in files about to be destroyed.
+            const dirtyAffected = this.documents.filter(d => {
+                const p = d.path ?? d.tempPath ?? null
+                if (!d.isDirty || !p) { return false }
+                if (safeFiles.some(f => this.isSameFsPath(f, p))) { return true }
+                return safeFolders.some(folder => p.startsWith(folder + path.sep))
+            })
+            const detailParts: string[] = []
+            if (safeFiles.length) { detailParts.push(`${safeFiles.length} file${safeFiles.length === 1 ? '' : 's'}`) }
+            if (safeFolders.length) { detailParts.push(`${safeFolders.length} folder${safeFolders.length === 1 ? '' : 's'}`) }
+            const dirtyLine = dirtyAffected.length
+                ? `  ⚠  ${dirtyAffected.length} unsaved file${dirtyAffected.length === 1 ? '' : 's'} will lose edits.`
+                : ''
+            const confirmed = await this.platform.showMessageBox({
+                type: 'warning',
+                message: `Move ${safeFiles.length + safeFolders.length} item${safeFiles.length + safeFolders.length === 1 ? '' : 's'} to Trash?`,
+                detail: `${detailParts.join(' and ')} will be moved to the OS trash and can be restored from there.${dirtyLine}`,
+                buttons: ['Move to Trash', 'Cancel'],
+                defaultId: 1,
+                cancelId: 1,
+            })
+            if (confirmed.response !== 0) { return }
+
+            if (this.simpleDiskMode) {
+                await this.deleteSelectionOnDiskSimple(safeFiles, safeFolders)
+                return
             }
 
             const deletedFiles = await this.deleteFilesOnDisk(fileTargets, true)
@@ -2937,19 +2965,43 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
             return false
         })
+        // Block autosave for every path we're about to remove, so a timer
+        // can't recreate a file between the model close and the fs delete.
+        for (const key of toDeleteFileKeys) { this.deletingPathKeys.add(key) }
+        for (const key of toDeleteFolderKeys) { this.deletingPathKeys.add(key) }
         for (const doc of docsToClose) {
             doc.isDirty = false
             await this.closeDocument(doc.id, true, true)
         }
 
+        // Prefer the OS trash via electron's shell.trashItem so deletions
+        // are recoverable from Finder/Explorer/Nautilus. Fall back to a
+        // permanent fs.rmSync only if trashItem is unavailable AND the
+        // user has already seen the move-to-trash confirmation above.
+        let trashItem: ((p: string) => Promise<void>) | null = null
+        try {
+            const { shell } = (window as any).require?.('electron') ?? {}
+            if (shell?.trashItem) {
+                trashItem = (p: string) => shell.trashItem(p)
+            }
+        } catch { /* no electron shell */ }
+
+        const failedItems: string[] = []
         let deletedFiles = 0
         for (const filePath of fileTargets) {
             try {
-                fsSync.rmSync(filePath, { force: true })
+                if (trashItem) {
+                    await trashItem(filePath)
+                } else {
+                    fsSync.rmSync(filePath, { force: true })
+                }
                 if (!fsSync.existsSync(filePath)) {
                     deletedFiles++
+                } else {
+                    failedItems.push(filePath)
                 }
             } catch (err: any) {
+                failedItems.push(filePath)
                 console.error('[deleteSelectionOnDiskSimple:file]', filePath, err?.message ?? err)
             }
         }
@@ -2960,13 +3012,23 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
                 continue
             }
             try {
-                fsSync.rmSync(folderPath, { recursive: true, force: true })
+                if (trashItem) {
+                    await trashItem(folderPath)
+                } else {
+                    fsSync.rmSync(folderPath, { recursive: true, force: true })
+                }
                 if (!fsSync.existsSync(folderPath)) {
                     deletedFolders++
+                } else {
+                    failedItems.push(folderPath)
                 }
             } catch (err: any) {
+                failedItems.push(folderPath)
                 console.error('[deleteSelectionOnDiskSimple:folder]', folderPath, err?.message ?? err)
             }
+        }
+        if (failedItems.length) {
+            this.setError(`${failedItems.length} item${failedItems.length === 1 ? '' : 's'} could not be deleted (see console).`)
         }
 
         for (const folderPath of folderTargets) {
@@ -2999,18 +3061,18 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
         const relatedDocs = this.documents.filter(doc =>
             this.isSameFsPath(doc.path, filePath) || this.isSameFsPath(doc.tempPath ?? null, filePath),
         )
-        if (!this.simpleDiskMode) {
+        // Always confirm discard of unsaved edits regardless of simpleDiskMode,
+        // unless caller already handled it (skipConfirm).
+        if (!skipConfirm) {
             for (const doc of relatedDocs) {
                 if (doc.isDirty && !(await this.confirmDiscard(doc))) {
                     return
                 }
             }
-        }
-        if (!this.simpleDiskMode && !skipConfirm) {
             if (!(await this.confirmAction(
-                `Delete ${path.basename(filePath)}?`,
-                'This action cannot be undone.',
-                'Delete',
+                `Move ${path.basename(filePath)} to Trash?`,
+                'The file will be moved to the OS trash and can be restored from there.',
+                'Move to Trash',
             ))) {
                 return
             }
@@ -3027,7 +3089,16 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             }
         }
         try {
-            await fs.unlink(filePath)
+            try {
+                const { shell } = (window as any).require?.('electron') ?? {}
+                if (shell?.trashItem) {
+                    await shell.trashItem(filePath)
+                } else {
+                    await fs.unlink(filePath)
+                }
+            } catch {
+                await fs.unlink(filePath)
+            }
             // Hide the deleted path so it never briefly reappears during
             // tree rebuilds triggered by closeDocument / persistState.
             this.hideTreePath(filePath)
@@ -3095,19 +3166,16 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             const docFolder = this.resolveDocFolder(doc)
             return docFolder === folderPath || (doc.path && doc.path.startsWith(folderPath + path.sep))
         })
-        if (!this.simpleDiskMode) {
+        if (!skipConfirm) {
             for (const doc of docsInFolder) {
                 if (doc.isDirty && !(await this.confirmDiscard(doc))) {
                     return
                 }
             }
-        }
-
-        if (!this.simpleDiskMode && !skipConfirm) {
             if (!(await this.confirmAction(
-                `Delete folder ${path.basename(folderPath) || folderPath}?`,
-                'All files and subfolders will be permanently removed.',
-                'Delete folder',
+                `Move folder ${path.basename(folderPath) || folderPath} to Trash?`,
+                'All files and subfolders will be moved to the OS trash and can be restored from there.',
+                'Move to Trash',
             ))) {
                 return
             }
@@ -3119,8 +3187,16 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             await this.closeDocument(doc.id, true, true)
         }
         try {
-            // Node 20 supports fs.rm
-            await fs.rm(folderPath, { recursive: true, force: this.simpleDiskMode })
+            try {
+                const { shell } = (window as any).require?.('electron') ?? {}
+                if (shell?.trashItem) {
+                    await shell.trashItem(folderPath)
+                } else {
+                    await fs.rm(folderPath, { recursive: true, force: this.simpleDiskMode })
+                }
+            } catch {
+                await fs.rm(folderPath, { recursive: true, force: this.simpleDiskMode })
+            }
             // If it was tracked as a root, remove it from list too
             if (this.folders.find(f => this.isSameFsPath(f.path, folderPath))) {
                 this.removeFolder(folderPath)
