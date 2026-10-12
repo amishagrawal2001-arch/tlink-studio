@@ -1006,10 +1006,10 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
             if (this.isProtectedWorkspaceFolder(node.path)) {
                 return 'Protected workspace folder'
             }
-            return 'Delete folder from disk'
+            return 'Remove folder from list (keep on disk — right-click to delete)'
         }
         if (node.path) {
-            return 'Delete file from disk'
+            return 'Remove file from list (keep on disk — right-click to delete)'
         }
         return 'Close file'
     }
@@ -1017,18 +1017,14 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     async closeTreeNode (node: TreeNode): Promise<void> {
         if (node.isFolder) {
             const folderPath = node.path
-            if (!folderPath) {
-                return
-            }
-            if (this.isProtectedWorkspaceFolder(folderPath)) {
-                return
-            }
-            await this.deleteSelectionOnDisk([], [folderPath])
+            if (!folderPath) { return }
+            if (this.isProtectedWorkspaceFolder(folderPath)) { return }
+            await this.removeFoldersFromList([folderPath])
             return
         }
 
         if (node.path) {
-            await this.deleteSelectionOnDisk([node.path], [])
+            await this.removeFilesFromList([node.path])
             return
         }
         if (node.docId) {
