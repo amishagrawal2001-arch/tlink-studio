@@ -418,7 +418,8 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
     topologyPanY = 0
     showTopologyMinimap = true
     formatOnSave = false
-    autosaveOnBlur = true
+    autosaveOnBlur = false
+    private autosaveInFlight = false
     zenMode = false
     lspService = new LspService()
     private lspDiagnosticDisposers = new Map<string, () => void>()
@@ -9586,9 +9587,24 @@ export class CodeEditorTabComponent extends BaseTabComponent implements AfterVie
 
     private onWindowBlur (): void {
         if (!this.autosaveOnBlur) { return }
-        const dirty = this.documents.filter(d => d.isDirty && d.path)
+        if (this.autosaveInFlight) { return }
+        // Only path-backed, non-conflict dirty docs — never prompt a
+        // 'Save As' for an untitled buffer behind the user's back.
+        const dirty = this.documents.filter(d =>
+            d.isDirty && d.path && !d.externalConflict && this.isModelAlive(d),
+        )
         if (!dirty.length) { return }
-        void this.saveAllFiles()
+        this.autosaveInFlight = true
+        void (async () => {
+            try {
+                for (const doc of dirty) {
+                    if (!this.isModelAlive(doc) || !doc.isDirty || !doc.path) { continue }
+                    await this.saveDocument(doc)
+                }
+            } finally {
+                this.autosaveInFlight = false
+            }
+        })()
     }
     private wheelRafPending = false
     private wheelAccumZoomFactor = 1
